@@ -1,0 +1,11 @@
+# data
+data/*.p
+data/w2v/*
+# vi
+tags
+*.tags
+*.swp
+*.swo
+
+# backup
+*_bak
