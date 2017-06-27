@@ -5,20 +5,28 @@ import theano
 import theano.tensor as T
 from theano.ifelse import ifelse
 from theano.tensor.signal import pool
-#from theano.tensor.signal import downsample
+# sfrom theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
 from theano import printing
 
+
 def ReLU(x):
-    return  T.maximum(0.0, x)
+    return T.maximum(0.0, x)
+
+
 def Sigmoid(x):
     return T.nnet.sigmoid(x)
+
+
 def Tanh(x):
     return T.tanh(x)
+
+
 def Iden(x):
     return x
+# ---------------------------------------------------------------------------------
 
-#---------------------------------------------------------------------------------
+
 class HiddenLayer(object):
     """ Class for HiddenLayer """
     def __init__(self, rng, input, n_in, n_out, activation, W=None, b=None):
@@ -31,7 +39,7 @@ class HiddenLayer(object):
                 W_values = np.asarray(0.01 * rng.standard_normal(size=(n_in, n_out)), dtype=theano.config.floatX)
             else:
                 W_values = np.asarray(rng.uniform(low=-np.sqrt(6. / (n_in + n_out)), high=np.sqrt(6. / (n_in + n_out)),
-                                                     size=(n_in, n_out)), dtype=theano.config.floatX)
+                                        size=(n_in, n_out)), dtype=theano.config.floatX)
             # make W a shared variable:
             W = theano.shared(value=W_values, name='W')
             """
@@ -114,32 +122,32 @@ class MLPDropout(object):
 
             # Reuse the parameters from the dropout layer here, in a different
             # path through the graph.
-            next_layer = HiddenLayer(rng=rng, # output of HiddenLayer
-                    input=next_layer_input,
-                    activation=activations[layer_counter],
-                    # scale the weight matrix W with (1-p)
-                    W=next_dropout_layer.W * (1 - dropout_rates[layer_counter]),
-                    b=next_dropout_layer.b,
-                    n_in=n_in, n_out=n_out)
+            next_layer = HiddenLayer(
+                rng=rng,  # output of HiddenLayer
+                input=next_layer_input,
+                activation=activations[layer_counter], #  scale the weight matrix W with (1-p)
+                W=next_dropout_layer.W * (1 - dropout_rates[layer_counter]),
+                b=next_dropout_layer.b,
+                n_in=n_in, n_out=n_out)
             self.layers.append(next_layer)
             next_layer_input = next_layer.output
-            #first_layer = False
+            # first_layer = False
             layer_counter += 1
 
         # Set up the output layer
         n_in, n_out = self.weight_matrix_sizes[-1]
         dropout_output_layer = LogisticRegression(
-                input=next_dropout_layer_input,
-                n_in=n_in, n_out=n_out)
+            input=next_dropout_layer_input,
+            n_in=n_in, n_out=n_out)
         self.dropout_layers.append(dropout_output_layer)
 
         # Again, reuse paramters in the dropout output.
         output_layer = LogisticRegression(
-                input=next_layer_input,
-                # scale the weight matrix W with (1-p)
-                W=dropout_output_layer.W * (1 - dropout_rates[-1]),
-                b=dropout_output_layer.b,
-                n_in=n_in, n_out=n_out)
+            input=next_layer_input,
+            # scale the weight matrix W with (1-p)
+            W=dropout_output_layer.W * (1 - dropout_rates[-1]),
+            b=dropout_output_layer.b,
+            n_in=n_in, n_out=n_out)
         self.layers.append(output_layer)
 
         # Use the negative log likelihood of the logistic regression layer as
@@ -158,15 +166,15 @@ class MLPDropout(object):
         self.soft_negative_log_likelihood = self.layers[-1].soft_negative_log_likelihood
 
         # Grab all the parameters together.
-        self.params = [ param for layer in self.dropout_layers for param in layer.params ]
+        self.params = [param for layer in self.dropout_layers for param in layer.params]
 
-    #methods for MLPDrop
+    # methods for MLPDrop
     # fcn predict returns argmax
     def predict(self, new_data):
         next_layer_input = new_data
-        for i,layer in enumerate(self.layers):
-            if i<len(self.layers)-1:
-                next_layer_input = self.activations[i](T.dot(next_layer_input,layer.W) + layer.b)
+        for i, layer in enumerate(self.layers):
+            if i < len(self.layers) - 1:
+                next_layer_input = self.activations[i](T.dot(next_layer_input, layer.W) + layer.b)
             else:
                 p_y_given_x = T.nnet.softmax(T.dot(next_layer_input, layer.W) + layer.b)
         y_pred = T.argmax(p_y_given_x, axis=1)
@@ -175,13 +183,15 @@ class MLPDropout(object):
     # fcn predict_p returns probability
     def predict_p(self, new_data):
         next_layer_input = new_data
-        for i,layer in enumerate(self.layers):
-            if i<len(self.layers)-1:
-                next_layer_input = self.activations[i](T.dot(next_layer_input,layer.W) + layer.b)
+        for i, layer in enumerate(self.layers):
+            if i < len(self.layers) - 1:
+                next_layer_input = self.activations[i](T.dot(next_layer_input, layer.W) + layer.b)
             else:
                 p_y_given_x = T.nnet.softmax(T.dot(next_layer_input, layer.W) + layer.b)
         return p_y_given_x
-#---------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
+
+
 class MLP(object):
     """Multi-Layer Perceptron Class
 
@@ -220,9 +230,10 @@ class MLP(object):
         # into a HiddenLayer with a tanh activation function connected to the
         # LogisticRegression layer; the activation function can be replaced by
         # sigmoid or any other nonlinear function
-        self.hiddenLayer = HiddenLayer(rng=rng, input=input,
-                                       n_in=n_in, n_out=n_hidden,
-                                       activation=T.tanh)
+        self.hiddenLayer = HiddenLayer(
+            rng=rng, input=input,
+            n_in=n_in, n_out=n_hidden,
+            activation=T.tanh)
 
         # The logistic regression layer gets as input the hidden units
         # of the hidden layer
@@ -242,7 +253,9 @@ class MLP(object):
 
         # the parameters of the model are the parameters of the two layer it is
         self.params = self.hiddenLayer.params + self.logRegressionLayer.params
-#---------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
+
+
 class LogisticRegression(object):
     """Multi-class Logistic Regression Class
 
@@ -272,16 +285,16 @@ class LogisticRegression(object):
         # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
         if W is None:
             self.W = theano.shared(
-                    value=np.zeros((n_in, n_out), dtype=theano.config.floatX),
-                    name='W')
+                value=np.zeros((n_in, n_out), dtype=theano.config.floatX),
+                name='W')
         else:
             self.W = W
 
         # initialize the baises b as a vector of n_out 0s
         if b is None:
             self.b = theano.shared(
-                    value=np.zeros((n_out,), dtype=theano.config.floatX),
-                    name='b')
+                value=np.zeros((n_out,), dtype=theano.config.floatX),
+                name='b')
         else:
             self.b = b
 
@@ -296,7 +309,7 @@ class LogisticRegression(object):
         # parameters of the model
         self.params = [self.W, self.b]
 
-    #method for LogisticRegression
+    # method for LogisticRegression
     def negative_log_likelihood(self, y):
         """Return the mean of the negative log-likelihood of the prediction
         of this model under a given target distribution.
@@ -335,8 +348,7 @@ class LogisticRegression(object):
         :param y: corresponds to a vector that gives for each example the distribution
          over classes. y.shape = [n, K]
         """
-        return -T.mean(T.sum(T.log(self.p_y_given_x)*y,axis=1))
-
+        return -T.mean(T.sum(T.log(self.p_y_given_x) * y, axis=1))
 
     def errors(self, y):
         """Return a float representing the number of errors in the minibatch ;
@@ -359,7 +371,7 @@ class LogisticRegression(object):
         else:
             raise NotImplementedError()
 
-#---------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
 class LeNetConvPoolLayer(object):
     """Pool Layer of a convolutional network """
 
@@ -399,22 +411,24 @@ class LeNetConvPoolLayer(object):
         #   pooling size
         fan_out = (filter_shape[0] * np.prod(filter_shape[2:]) /np.prod(poolsize))
         # initialize weights with random weights
-        if self.non_linear=="none" or self.non_linear=="relu":
-            self.W = theano.shared(np.asarray(rng.uniform(low=-0.01,high=0.01,size=filter_shape),
-                                                dtype=theano.config.floatX),borrow=True,name="W_conv")
+        if self.non_linear == "none" or self.non_linear == "relu":
+            self.W = theano.shared(
+                np.asarray(rng.uniform(low=-0.01, high=0.01, size=filter_shape), dtype=theano.config.floatX),
+                borrow=True,name="W_conv")
         else:
             W_bound = np.sqrt(6. / (fan_in + fan_out))
-            self.W = theano.shared(np.asarray(rng.uniform(low=-W_bound, high=W_bound, size=filter_shape),
-                dtype=theano.config.floatX),borrow=True,name="W_conv")
+            self.W = theano.shared(
+                np.asarray(rng.uniform(low=-W_bound, high=W_bound, size=filter_shape),
+                dtype=theano.config.floatX), sborrow=True,name="W_conv")
         b_values = np.zeros((filter_shape[0],), dtype=theano.config.floatX)
         self.b = theano.shared(value=b_values, borrow=True, name="b_conv")
 
         # convolve input feature maps with filters
         conv_out = conv.conv2d(input=input, filters=self.W,filter_shape=self.filter_shape, image_shape=self.image_shape)
-        if self.non_linear=="tanh":
+        if self.non_linear == "tanh":
             conv_out_tanh = T.tanh(conv_out + self.b.dimshuffle('x', 0, 'x', 'x'))
             self.output = pool.pool_2d(input=conv_out_tanh, ds=self.poolsize, ignore_border=True)
-        elif self.non_linear=="relu":
+        elif self.non_linear == "relu":
             conv_out_tanh = ReLU(conv_out + self.b.dimshuffle('x', 0, 'x', 'x'))
             self.output = pool.pool_2d(input=conv_out_tanh, ds=self.poolsize, ignore_border=True)
         else:
@@ -455,16 +469,16 @@ class LogicNN(object): # LogicNN takes a network as parameter
         self.network = network
         self.rules = rules
         self.rule_lambda = theano.shared(
-                          np.asarray(rule_lambda, dtype=theano.config.floatX),
-                          name='rule_lambda')
-        self.ones = theano.shared(value=np.ones(len(rules))*1., name='ones')
+            np.asarray(rule_lambda, dtype=theano.config.floatX),
+            name='rule_lambda')
+        self.ones = theano.shared(value=np.ones(len(rules)) * 1., name='ones')
         self.pi = theano.shared(value=pi, name='pi')
         self.C = C
 
         ## q(y|x)
         # dropout_p_y_given_x: output of a LogisticRegression Layer (of a network)
-        dropout_q_y_given_x = self.network.dropout_p_y_given_x*1.0
-        q_y_given_x = self.network.p_y_given_x*1.0
+        dropout_q_y_given_x = self.network.dropout_p_y_given_x * 1.0
+        q_y_given_x = self.network.p_y_given_x * 1.0
         # combine rule constraints
         distr = self.calc_rule_constraints()
         q_y_given_x *= distr
@@ -486,8 +500,8 @@ class LogicNN(object): # LogicNN takes a network as parameter
 
     # methods for LogicNN
     def calc_rule_constraints(self, new_data=None, new_rule_fea=None):
-        if new_rule_fea==None:
-            new_rule_fea = [None]*len(self.rules)
+        if new_rule_fea == None:
+            new_rule_fea = [None] * len(self.rules)
         distr_all = T.cast(0, dtype=theano.config.floatX)
         for i,rule in enumerate(self.rules):
             distr = rule.log_distribution(self.C*self.rule_lambda[i],new_data,new_rule_fea[i])
@@ -503,6 +517,7 @@ class LogicNN(object): # LogicNN takes a network as parameter
 
     def set_pi(self, new_pi):
         self.pi.set_value(new_pi)
+
     def get_pi(self):
         return self.pi.get_value()
 
@@ -516,7 +531,7 @@ class LogicNN(object): # LogicNN takes a network as parameter
         nlld += self.pi*self.network.soft_negative_log_likelihood(self.q_y_given_x)
         return nlld
 
-    def errors(self, y): # return average mistakes by q / p
+    def errors(self, y):  # return average mistakes by q / p
         # check if y has same dimension of y_pred
         if y.ndim != self.q_y_pred.ndim:
             raise TypeError('y should have the same shape as self.y_pred',

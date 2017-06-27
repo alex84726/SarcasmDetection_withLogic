@@ -72,14 +72,14 @@ def train_conv_net(datasets,
                   ("non_static", non_static),
                   ("sqr_norm_lim", sqr_norm_lim),
                   ("shuffle_batch", shuffle_batch),
-                  ("pi_params",pi_params),
-                  ("C",C)]
+                  ("pi_params", pi_params),
+                  ("C", C)]
     print parameters
-    #define model architecture
+    # define model architecture
     index = T.lscalar()
     x = T.matrix('x')
     y = T.ivector('y')
-    Words = theano.shared(value = U, name = "Words")
+    Words = theano.shared(value=U, name="Words")
     zero_vec_tensor = T.vector()
     zero_vec = np.zeros(img_w)
     set_zero = theano.function([zero_vec_tensor],
@@ -97,7 +97,7 @@ def train_conv_net(datasets,
         conv_layers.append(conv_layer)
         layer1_inputs.append(layer1_input)
     layer1_input = T.concatenate(layer1_inputs,1)
-    hidden_units[0] = feature_maps*len(filter_hs)
+    hidden_units[0] = feature_maps * len(filter_hs)
     classifier = MLPDropout(rng, input=layer1_input, layer_sizes=hidden_units, activations=activations, dropout_rates=dropout_rate)
 
     # build the feature of RULE1-rule
@@ -146,7 +146,7 @@ def train_conv_net(datasets,
         permutation_order = np.random.permutation(datasets[0].shape[0])
         train_set = datasets[0][permutation_order]
         extra_data = train_set[:extra_data_num]
-        new_data = np.append(datasets[0],extra_data,axis=0)
+        new_data = np.append(datasets[0], extra_data,axis=0)
         new_fea = {}
         train_fea = datasets[3]
         for k in train_fea.keys():
@@ -155,7 +155,7 @@ def train_conv_net(datasets,
             new_fea[k] = np.append(train_fea[k],extra_fea,axis=0)
         train_text = datasets[6][permutation_order]
         extra_text = train_text[:extra_data_num]
-        new_text=np.append(datasets[6],extra_text,axis=0)
+        new_text = np.append(datasets[6],extra_text,axis=0)
     else:
         new_data, new_fea, new_test = datasets[0], datasets[3], datasets[6]
 
@@ -169,7 +169,7 @@ def train_conv_net(datasets,
     n_batches = new_data.shape[0] // batch_size
     n_train_batches = n_batches
     train_set = new_data
-    train_set_x, train_set_y = shared_dataset((train_set[:,:img_h], train_set[:, -1]))
+    train_set_x, train_set_y = shared_dataset((train_set[:, :img_h], train_set[:, -1]))
     train_fea = new_fea
     train_fea_rule1_ind = train_fea['rule1_ind'].reshape([train_fea['rule1_ind'].shape[0], 1])
     train_fea_rule1_ind = shared_fea(train_fea_rule1_ind)
@@ -177,7 +177,7 @@ def train_conv_net(datasets,
     train_fea_rule1_senti = shared_fea(train_fea_rule1_senti)
 
     for k in new_fea.keys():
-        if k!='rule1_text':
+        if k != 'rule1_text':
             train_fea[k] = shared_fea(new_fea[k])
 
     # val data
@@ -340,12 +340,12 @@ def train_conv_net(datasets,
         # import pdb; pdb.set_trace()
         train_losses = [test_model(i) for i in xrange(n_train_batches)]
         train_losses = np.array(train_losses)
-        train_q_perf = 1 - np.mean(train_losses[:,0])
-        train_p_perf = 1 - np.mean(train_losses[:,1])
+        train_q_perf = 1 - np.mean(train_losses[:, 0])
+        train_p_perf = 1 - np.mean(train_losses[:, 1])
         val_losses = [val_model(i) for i in xrange(n_val_batches)]
         val_losses = np.array(val_losses)
-        val_q_perf = 1 - np.mean(val_losses[:,0])
-        val_p_perf = 1 - np.mean(val_losses[:,1])
+        val_q_perf = 1 - np.mean(val_losses[:, 0])
+        val_p_perf = 1 - np.mean(val_losses[:, 1])
         print('epoch: %i, training time: %.2f secs; (q): train perf: %.4f %%, val perf: %.4f %%; (p): train perf: %.4f %%, val perf: %.4f %%' % \
                (epoch, time.time()-start_time, train_q_perf * 100., val_q_perf*100., train_p_perf * 100., val_p_perf*100.))
         # test_loss = test_model_all(test_set_x,test_set_y,test_fea['rule1'],test_fea_rule1_ind)
@@ -366,7 +366,7 @@ def train_conv_net(datasets,
 
 def get_pi(cur_iter, params=None, pi=None):
     """ exponential decay: pi_t = max{1 - k^t, lb} """
-    k,lb = params[0],params[1]
+    k, lb = params[0], params[1]
     pi = 1. - max([k**cur_iter, lb])
     return pi
 
@@ -450,7 +450,7 @@ def sgd_updates_adadelta(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9,word_vec_n
             stepped_param = param + step * .3
         else:
             stepped_param = param + step
-        if (param.get_value(borrow=True).ndim == 2) and (param.name!='Words'):
+        if (param.get_value(borrow=True).ndim == 2) and (param.name != 'Words'):
             col_norms = T.sqrt(T.sum(T.sqr(stepped_param), axis=0))
             desired_norms = T.clip(col_norms, 0, T.sqrt(norm_lim))
             scale = desired_norms / (1e-7 + col_norms)
@@ -538,15 +538,15 @@ def make_idx_data(revs, fea, word_idx_map, max_l=51, k=300, filter_h=5):
         else:
             # if count_tt ==0 or np.shape(rev["text"]) == np.shape(test_text[0]):
             test.append(sent)
-            for k,v in fea.iteritems():
+            for k, v in fea.iteritems():
                 test_fea[k].append(v[i])
             test_text.append(rev["text"])
             # count_tt =count_tt + 1
     print(type(train))
     print(len(train))
 
-    post_train, post_dev, post_test=[], [], []
-    excep_train, excep_dev, excep_test=[], [], []
+    post_train, post_dev, post_test = [], [], []
+    excep_train, excep_dev, excep_test = [], [], []
     for idn, tr in enumerate(train):
         post_train.append(tr)
         if np.shape(tr) != np.shape(train[0]):
@@ -569,25 +569,25 @@ def make_idx_data(revs, fea, word_idx_map, max_l=51, k=300, filter_h=5):
     post_dev   = np.array(post_dev,dtype="int")
     post_test  = np.array(post_test,dtype="int")
     """
-    train = np.array(train,dtype="int")
-    dev   = np.array(dev,dtype="int")
-    test  = np.array(test,dtype="int")
+    train = np.array(train, dtype="int")
+    dev = np.array(dev, object=dtype="int")
+    test = np.array(test, dtype="int")
     for k in fea.keys():
-        if k=='rule1':
+        if k == 'rule1':
             train_fea[k] = np.array(train_fea[k],dtype='int')
             dev_fea[k] = np.array(dev_fea[k],dtype='int')
             test_fea[k] = np.array(test_fea[k],dtype='int')
-        elif k=='rule1_text':
+        elif k == 'rule1_text':
             train_fea[k] = np.array(train_fea[k])
             dev_fea[k] = np.array(dev_fea[k])
             test_fea[k] = np.array(test_fea[k])
         else:
-            train_fea[k] = np.array(train_fea[k],dtype=theano.config.floatX)
-            dev_fea[k] = np.array(dev_fea[k],dtype=theano.config.floatX)
-            test_fea[k] = np.array(test_fea[k],dtype=theano.config.floatX)
-    train_text  = np.array(train_text)
-    dev_text    = np.array(dev_text)
-    test_text   = np.array(test_text)
+            train_fea[k] = np.array(train_fea[k], dtype=theano.config.floatX)
+            dev_fea[k] = np.array(dev_fea[k], dtype=theano.config.floatX)
+            test_fea[k] = np.array(test_fea[k], dtype=theano.config.floatX)
+    train_text = np.array(train_text)
+    dev_text = np.array(dev_text)
+    test_text = np.array(test_text)
     return [train, dev, test, train_fea, dev_fea, test_fea, train_text, dev_text, test_text]
 
 
