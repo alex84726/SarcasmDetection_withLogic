@@ -9,7 +9,10 @@
   ```
   python2 preproc.py
   ```
-  then, we got sarcasm_data_proc.npy and nonsarc_data_proc.npy as the final
-  dataset to run the program
+  then, we got 
+  ```
+  sarcasm_data_proc.npy and nonsarc_data_proc.npy 
+  ```
+  as the final dataset to run the program
 
 # label_sarcasm : twitter txt splict into 3-folds for mannual labeling  
