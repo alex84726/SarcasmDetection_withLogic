@@ -1,7 +1,7 @@
 # SarcasmDetection_withLogic
 We use logic patterns discovered by linguists to do sarcasm detection with neural network
 
-## data
+## Data
 - Row data crawl from twiiter
 - pre-trained word embedding
 - pre-processed text (*.npy, *.pkl) and  related scripts
