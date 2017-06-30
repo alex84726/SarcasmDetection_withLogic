@@ -1,4 +1,5 @@
 import numpy as np
+import os.path as path
 import re
 import itertools
 from collections import Counter
@@ -31,13 +32,24 @@ def load_data_and_labels(positive_data_file, negative_data_file):
     Returns split sentences and labels.
     """
     # Load data from files
-    positive_examples = list(open(positive_data_file, "r").readlines())
+    if path.splitext(path.basename(positive_data_file))[1] == '.npy':
+        positive_examples = np.load(positive_data_file)
+        positive_examples = [s.decode('utf-8') for s in positive_examples]
+    else:
+        positive_examples = list(open(positive_data_file, "r").readlines())
     positive_examples = [s.strip() for s in positive_examples]
-    negative_examples = list(open(negative_data_file, "r").readlines())
+
+    if path.splitext(path.basename(negative_data_file))[1] == '.npy':
+        negative_examples = np.load(negative_data_file)
+        negative_examples = [s.decode('utf-8') for s in negative_examples]
+    else:
+        negative_examples = list(open(negative_data_file, "r").readlines())
     negative_examples = [s.strip() for s in negative_examples]
+
     # Split by words
     x_text = positive_examples + negative_examples
     x_text = [clean_str(sent) for sent in x_text]
+
     # Generate labels
     positive_labels = [[0, 1] for _ in positive_examples]
     negative_labels = [[1, 0] for _ in negative_examples]
