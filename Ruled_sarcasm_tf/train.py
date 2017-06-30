@@ -16,7 +16,7 @@ from text_cnn import TextCNN
 # ==================================================
 
 # Data loading params
-tf.flags.DEFINE_float("dev_sample_percentage", .1, "Percentage of the training data to use for validation")
+tf.flags.DEFINE_float("dev_sample_percentage", 0.1, "Percentage of the training data to use for validation")
 tf.flags.DEFINE_string("positive_data_file", "../Data/sarcasm_data_proc.npy", "Data source for the positive data.")
 tf.flags.DEFINE_string("negative_data_file", "../Data/nonsarc_data_proc.npy", "Data source for the negative data.")
 
@@ -33,6 +33,7 @@ tf.flags.DEFINE_integer("num_epochs", 200, "Number of training epochs (default: 
 tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (default: 5)")
+
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
@@ -151,6 +152,7 @@ with tf.Graph().as_default():
                 [train_op, global_step, train_summary_op, cnn.loss, cnn.accuracy],
                 feed_dict)
             time_str = datetime.datetime.now().isoformat()
+            # if step % FLAGS.evaluate_every == 0:
             print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
             train_summary_writer.add_summary(summaries, step)
 
@@ -171,9 +173,10 @@ with tf.Graph().as_default():
             if writer:
                 writer.add_summary(summaries, step)
 
-        # Generate batches
+        # Batches Generator
         batches = data_helpers.batch_iter(
             list(zip(x_train, y_train)), FLAGS.batch_size, FLAGS.num_epochs)
+
         # Training loop. For each batch...
         for batch in batches:
             x_batch, y_batch = zip(*batch)
