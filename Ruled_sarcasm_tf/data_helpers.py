@@ -56,6 +56,23 @@ def load_data_and_labels(positive_data_file, negative_data_file):
     y = np.concatenate([positive_labels, negative_labels], 0)
     return [x_text, y]
 
+def load_npy_data(data_file):
+    '''
+    input: numpy array of shape[?, 2]
+    input[0] = b'0' OR b'1'
+    input[1] = b'sentence'
+
+    return: sentence, label(in shape[?, 2])
+    '''
+    data = np.load(data_file)
+    X = data[:, 1]
+    X = [clean_str(s.decode('utf-8')) for s in X] 
+
+    index = list(map(int, data[:, 0]))
+    y = np.zeros([len(index), 2])
+    for i, v in enumerate(index):
+        y[i][v] = 1
+    return X, y
 
 def batch_iter(data, batch_size, num_epochs, shuffle=True):
     """
