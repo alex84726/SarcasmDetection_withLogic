@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import learn
 
+
 import data_helpers
 from text_cnn import TextCNN
 
@@ -29,8 +30,8 @@ tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (defau
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 0.0)")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-tf.flags.DEFINE_integer("num_epochs", 200, "Number of training epochs (default: 200)")
+tf.flags.DEFINE_integer("batch_size", 32, "Batch Size (default: 32)")
+tf.flags.DEFINE_integer("num_epochs", 80, "Number of training epochs (default: 80)")
 tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (default: 5)")
@@ -38,6 +39,7 @@ tf.flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (d
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
+tf.flags.DEFINE_float("gpu_usage", 1.0, "per process gpu memory fraction, (defult: 1.0)")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -83,7 +85,7 @@ print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
 
 with tf.Graph().as_default():
     session_conf = tf.ConfigProto(
-        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.2),
+        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_usage),
         allow_soft_placement=FLAGS.allow_soft_placement,
         log_device_placement=FLAGS.log_device_placement)
     sess = tf.Session(config=session_conf)

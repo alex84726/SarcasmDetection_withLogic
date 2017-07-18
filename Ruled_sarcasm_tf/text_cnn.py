@@ -24,12 +24,12 @@ class TextCNN(object):
                 "W",
                 initializer=tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0))
             self.embedded_chars = tf.nn.embedding_lookup(self.W, self.input_x)
-            self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1)
+            self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1)  # size:  [None, sequence_length, embedding_size, 1]
 
         # Create a convolution + maxpool layer for each filter size
         pooled_outputs = []
         for i, filter_size in enumerate(filter_sizes):
-            with tf.variable_scope("conv-maxpool-%s" % filter_size):
+            with tf.variable_scope("conv1-maxpool-%s" % filter_size):
                 # Convolution Layer
                 filter_shape = [filter_size, embedding_size, 1, num_filters]
                 W = tf.get_variable("W", initializer=tf.truncated_normal(filter_shape, stddev=0.1))
@@ -39,13 +39,38 @@ class TextCNN(object):
                     W,
                     strides=[1, 1, 1, 1],
                     padding="VALID",
-                    name="conv")
+                    name="conv")  # size: [None, 49-3+1, 1,128]
+                # Apply batch_normalization
+                conv_bn = tf.contrib.layers.batch_norm(conv, center=True, scale=False, scope='BN')
                 # Apply nonlinearity
-                h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
+                h = tf.nn.relu(tf.nn.bias_add(conv_bn, b), name="relu")
                 # Maxpooling over the outputs
                 pooled = tf.nn.max_pool(
                     h,
-                    ksize=[1, sequence_length - filter_size + 1, 1, 1],
+                    ksize=[1, filter_size, 1, 1],
+                    strides=[1, 1, 1, 1],
+                    padding='VALID',
+                    name="pool")
+                # pooled_outputs.append(pooled)
+            with tf.variable_scope("conv2-maxpool-%s" % filter_size):
+                # Convolution Layer
+                filter_shape = [filter_size, 1, num_filters, num_filters]
+                W = tf.get_variable("W", initializer=tf.truncated_normal(filter_shape, stddev=0.1))
+                b = tf.get_variable("b", initializer=tf.constant(0.1, shape=[num_filters]))
+                conv2 = tf.nn.conv2d(
+                    pooled,  # size: [None, 45, 1, 128]
+                    W,
+                    strides=[1, 1, 1, 1],
+                    padding="VALID",
+                    name="conv")
+                # Apply batch_normalization
+                conv_bn = tf.contrib.layers.batch_norm(conv2, center=True, scale=False, scope='BN')
+                # Apply nonlinearity
+                h = tf.nn.relu(tf.nn.bias_add(conv_bn, b), name="relu")  # size: [None, 43, 1, 128]
+                # Maxpooling over the outputs
+                pooled = tf.nn.max_pool(  # size: [None, 43, 1, 128]
+                    h,
+                    ksize=[1, h.get_shape()[1], 1, 1],
                     strides=[1, 1, 1, 1],
                     padding='VALID',
                     name="pool")
