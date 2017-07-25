@@ -277,7 +277,7 @@ def train_conv_net(datasets,
             f_rule1: train_fea['rule1'][index * batch_size: (index + 1) * batch_size],
             f_rule1_senti: train_fea_rule1_senti[index * batch_size: (index + 1) * batch_size,:],
             f_rule1_ind: train_fea_rule1_ind[index * batch_size: (index + 1) * batch_size,:]},
-        allow_input_downcast = True, on_unused_input='warn')
+        allow_input_downcast=True, on_unused_input='warn')
 
     ### setup testing
     test_size = test_set_x.shape[0]
@@ -319,7 +319,6 @@ def train_conv_net(datasets,
     cost_epoch = 0
     stop_count = 0
     while (epoch < n_epochs):
-        import pdb; pdb.set_trace()
         start_time = time.time()
         epoch += 1
 
@@ -331,7 +330,7 @@ def train_conv_net(datasets,
 
         for minibatch_index in batch_permutation:
             batch += 1
-            new_pi = get_pi(cur_iter=batch*1./n_train_batches, params=pi_params)
+            new_pi = get_pi(cur_iter=batch * 1. / n_train_batches, params=pi_params)
             logic_nn.set_pi(new_pi)
             cost_epoch = train_model(minibatch_index)
             set_zero(zero_vec)
@@ -347,7 +346,7 @@ def train_conv_net(datasets,
         val_q_perf = 1 - np.mean(val_losses[:, 0])
         val_p_perf = 1 - np.mean(val_losses[:, 1])
         print('epoch: %i, training time: %.2f secs; (q): train perf: %.4f %%, val perf: %.4f %%; (p): train perf: %.4f %%, val perf: %.4f %%' % \
-               (epoch, time.time()-start_time, train_q_perf * 100., val_q_perf*100., train_p_perf * 100., val_p_perf*100.))
+               (epoch, time.time() - start_time, train_q_perf * 100., val_q_perf * 100., train_p_perf * 100., val_p_perf * 100.))
         # test_loss = test_model_all(test_set_x,test_set_y,test_fea['rule1'],test_fea_rule1_ind)
         # test_loss = np.array(test_loss)
         # test_perf = 1 - test_loss
@@ -385,13 +384,15 @@ def shared_dataset(data_xy, borrow=True):
         shared_y = theano.shared(np.asarray(data_y, dtype=theano.config.floatX), borrow=borrow)
         return shared_x, T.cast(shared_y, 'int32')
 
+
 def shared_fea(fea, borrow=True):
     """
     Function that loads the features into shared variables
     """
     return theano.shared(np.asarray(fea, dtype=theano.config.floatX), borrow=borrow)
 
-def sgd_updates_adadelta(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9,word_vec_name='Words'):
+
+def sgd_updates_adadelta(params, cost, rho=0.95, epsilon=1e-6, norm_lim=9, word_vec_name='Words'):
     """
     adadelta update rule, mostly from
     https://groups.google.com/forum/#!topic/pylearn-dev/3QbKtCumAW4 (for Adadelta)
@@ -524,7 +525,7 @@ def make_idx_data(revs, fea, word_idx_map, max_l=51, k=300, filter_h=5):
         if rev["split"] == 0:
             # if count_tr ==0 or np.shape(rev["text"]) == np.shape(train_text[0]):
             train.append(sent)
-            for k,v in fea.iteritems():
+            for k, v in fea.iteritems():
                 train_fea[k].append(v[i])
             train_text.append(rev["text"])
             # count_tr =count_tr + 1
@@ -574,9 +575,9 @@ def make_idx_data(revs, fea, word_idx_map, max_l=51, k=300, filter_h=5):
     test = np.array(test, dtype="int")
     for k in fea.keys():
         if k == 'rule1':
-            train_fea[k] = np.array(train_fea[k],dtype='int')
-            dev_fea[k] = np.array(dev_fea[k],dtype='int')
-            test_fea[k] = np.array(test_fea[k],dtype='int')
+            train_fea[k] = np.array(train_fea[k], dtype='int')
+            dev_fea[k] = np.array(dev_fea[k], dtype='int')
+            test_fea[k] = np.array(test_fea[k], dtype='int')
         elif k == 'rule1_text':
             train_fea[k] = np.array(train_fea[k])
             dev_fea[k] = np.array(dev_fea[k])
