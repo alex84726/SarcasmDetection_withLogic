@@ -83,7 +83,8 @@ class TextCNN(object):
 
         # Add dropout
         with tf.variable_scope("dropout"):
-            self.h_drop = tf.nn.dropout(self.h_pool_flat, self.dropout_keep_prob)
+            self.h_drop = tf.nn.dropout(self.h_pool_flat, self.dropout_keep_prob, name='h_drop')
+            self.h_drop_p = tf.nn.softmax(self.h_drop, dim=-1, name='h_drop_p')
 
         # Final (unnormalized) scores and predictions
         with tf.variable_scope("output"):
@@ -103,6 +104,10 @@ class TextCNN(object):
             losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y)
             self.loss = tf.reduce_mean(losses) + l2_reg_lambda * l2_loss
 
+        with tf.name_scope("drop_loss"):
+            losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.h_drop, labels=self.input_y)
+            self.drop_loss = tf.reduce_mean(losses) + l2_reg_lambda * l2_loss
+        
         # Accuracy
         with tf.name_scope("accuracy"):
             correct_predictions = tf.equal(self.predictions, tf.argmax(self.input_y, 1))

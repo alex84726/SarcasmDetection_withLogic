@@ -2,10 +2,11 @@ import numpy as np
 import tensorflow as tf
 
 
-class LogicNN(object):  # LogicNN takes a network as parameter
+class LogicNN(object):
     def __init__(self, rng, input, network, rules=[], rule_lambda=[], pi=0., C=1.):
         """
         :param input: symbolic image tensor, of shape image_shape
+        :param network: student network
         """
         self.input = input
         self.network = network
@@ -17,10 +18,12 @@ class LogicNN(object):  # LogicNN takes a network as parameter
 
         ## q(y|x)
         # dropout_p_y_given_x: output of a LogisticRegression Layer (of a network)
-        dropout_q_y_given_x = self.network.h_drop * 1.0  # self.network.h_drop  = self.network.dropout_p_y_given_x
-        q_y_given_x = self.network.scores * 1.0  # self.network.scores  = self.network.p_y_given_x
+        dropout_q_y_given_x = self.network.h_drop_p * 1.0  # self.network.h_drop  = self.network.dropout_p_y_given_x
+        q_y_given_x = self.network.predict_p * 1.0  # self.network.predict_p  = self.network.p_y_given_x
         # combine rule constraints
-        distr = self.calc_rule_constraints()
+        distr = self.calc_rule_constraints(new_data=new_data, new_rule_fea=new_rule_fea)
+        # TODO: calc_rule_constraints() lack of input argument
+
         q_y_given_x *= distr
         dropout_q_y_given_x *= distr
 
@@ -31,13 +34,37 @@ class LogicNN(object):  # LogicNN takes a network as parameter
         self.dropout_q_y_given_x = tf.stop_gradient(n_dropout_q_y_given_x)
         self.q_y_given_x = tf.stop_gradient(n_q_y_given_x)
 
-        # compute prediction as class whose probability is maximal in symbolic form
-        self.q_y_pred = tf.argmax(q_y_given_x, axis=1)
-        self.p_y_pred = self.network.predictions
 
         # collect all learnable parameters
         # self.params_p = self.network.params
 
+        q_loss = tf.nn.softmax_cross_entropy_with_logits(logits=self.network.scores, labels=self.q_y_given_x)
+        self.q_loss = tf.reduce_mean(q_loss)
+
+        self.neg_log_liklihood = (1.0 - self.pi) * self.network.loss
+        self.neg_log_liklihood += self.pi * self.q_loss
+
+        drop_q_loss = tf.nn.softmax_cross_entropy_with_logits(logits=self.network.h_drop, labels=self.q_y_given_x)
+        self.drop_q_loss = tf.reduce_mean(drop_q_loss)
+
+        self.drop_neg_log_liklihood = (1.0 - self.pi) * self.network.drop_loss
+        self.drop_neg_log_liklihood += self.pi * self.drop_q_loss
+
+
+        # compute prediction as class whose probability is maximal in symbolic form
+        # return LogicNN's q/p argmax predictions
+        self.q_y_pred = tf.argmax(q_y_given_x, axis=1)
+        self.p_y_pred = self.network.predictions
+
+        # return LogicNN's q/p prob. predictions
+        self.p_y_pred_p = self.network.predict_p
+        self.q_y_pred_p = p_y_pred_p * self.calc_rule_constraints(new_data=new_data, new_rule_fea=new_rule_fea)
+        # TODO: calc_rule_constraints() lack of input argument
+
+        q_correct_predictions = tf.equal(self.q_y_pred, tf.argmax(self.network.input_y, 1))
+        self.q_accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="q_accuracy")
+
+        
     # methods for LogicNN
     def calc_rule_constraints(self, new_data=None, new_rule_fea=None):
         if new_rule_fea is None:
@@ -60,39 +87,3 @@ class LogicNN(object):  # LogicNN takes a network as parameter
 
     # def get_pi(self):
     #     return self.pi.get_value()
-
-    def dropout_negative_log_likelihood(self, y):
-        nlld = (1.0 - self.pi) * self.network.dropout_negative_log_likelihood(y)
-        nlld += self.pi * self.network.soft_dropout_negative_log_likelihood(self.dropout_q_y_given_x)
-        return nlld
-
-    def negative_log_likelihood(self, y):
-        nlld = (1.0 - self.pi) * self.network.loss
-        nlld += self.pi * self.network.soft_negative_log_likelihood(self.q_y_given_x)
-        return nlld
-
-    def errors(self, y):  # return average mistakes by q / p
-        # check if y has same dimension of y_pred
-        if y.ndim != self.q_y_pred.ndim:
-            raise TypeError('y should have the same shape as self.y_pred',
-                ('y', target.type, 'y_pred', self.q_y_pred.type))
-        # check if y is of the correct datatype
-        if y.dtype.startswith('int'):
-            # the T.neq operator returns a vector of 0s and 1s, where 1
-            # represents a mistake in prediction
-            return T.mean(T.neq(self.q_y_pred, y)), T.mean(T.neq(self.p_y_pred, y))
-        else:
-            raise NotImplementedError()
-
-    # return LogicNN's q/p argmax predictions
-    def predict(self, new_data_to_network, new_data, new_rule_fea):
-        q_y_pred_p, p_y_pred_p = self.predict_p(new_data_to_network, new_data, new_rule_fea)
-        q_y_pred = T.argmax(q_y_pred_p, axis=1)
-        p_y_pred = T.argmax(p_y_pred_p, axis=1)
-        return q_y_pred, p_y_pred
-
-    # return LogicNN's q/p prob. predictions
-    def predict_p(self, new_data_to_network, new_data, new_rule_fea):
-        p_y_pred_p = self.network.predict_p(new_data_to_network)
-        q_y_pred_p = p_y_pred_p * self.calc_rule_constraints(new_data=new_data, new_rule_fea=new_rule_fea)
-        return q_y_pred_p, p_y_pred_p
