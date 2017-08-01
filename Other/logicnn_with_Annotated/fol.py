@@ -63,7 +63,7 @@ class FOL(object):
     version specific to the BUT-rule
     """
     def log_distribution(self, w, X=None, F=None, config={}):
-        """ Return an nxK matrix with the (i,c)-th term
+    """ Return an nxK matrix with the (i,c)-th term
     = - w * (1 - r(X_i, y_i=c))
            if X_i is a grounding of the rule
     = 1    otherwise
