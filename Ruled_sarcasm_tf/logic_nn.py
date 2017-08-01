@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 class LogicNN(object):
-    def __init__(self, rng, input, network, rules=[], rule_lambda=[], pi=0., C=1.):
+    def __init__(self, input, network, rules=[], rule_lambda=[], pi=0., C=1.):
         """
         :param input: symbolic image tensor, of shape image_shape
         :param network: student network
@@ -28,12 +28,11 @@ class LogicNN(object):
         dropout_q_y_given_x *= distr
 
         # normalize (dropout_q_y_given_x)
-        n = int(self.input.get_shape()[0])
+        n = int(self.input.get_shape()[0])  #TODO: remove self.input, n
         n_dropout_q_y_given_x = dropout_q_y_given_x / tf.reshape(tf.reduce_sum(dropout_q_y_given_x, axis=1), [n, 1])
         n_q_y_given_x = q_y_given_x / tf.reshape(tf.reduce_sum(q_y_given_x, axis=1), [n, 1])
         self.dropout_q_y_given_x = tf.stop_gradient(n_dropout_q_y_given_x)
         self.q_y_given_x = tf.stop_gradient(n_q_y_given_x)
-
 
         # collect all learnable parameters
         # self.params_p = self.network.params
@@ -41,15 +40,12 @@ class LogicNN(object):
         q_loss = tf.nn.softmax_cross_entropy_with_logits(logits=self.network.scores, labels=self.q_y_given_x)
         self.q_loss = tf.reduce_mean(q_loss)
 
-        self.neg_log_liklihood = (1.0 - self.pi) * self.network.loss
-        self.neg_log_liklihood += self.pi * self.q_loss
+        self.neg_log_liklihood = (1.0 - self.pi) * self.network.loss + self.pi * self.q_loss
 
         drop_q_loss = tf.nn.softmax_cross_entropy_with_logits(logits=self.network.h_drop, labels=self.q_y_given_x)
         self.drop_q_loss = tf.reduce_mean(drop_q_loss)
 
-        self.drop_neg_log_liklihood = (1.0 - self.pi) * self.network.drop_loss
-        self.drop_neg_log_liklihood += self.pi * self.drop_q_loss
-
+        self.drop_neg_log_liklihood = (1.0 - self.pi) * self.network.drop_loss + self.pi * self.drop_q_loss
 
         # compute prediction as class whose probability is maximal in symbolic form
         # return LogicNN's q/p argmax predictions
@@ -64,7 +60,6 @@ class LogicNN(object):
         q_correct_predictions = tf.equal(self.q_y_pred, tf.argmax(self.network.input_y, 1))
         self.q_accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="q_accuracy")
 
-        
     # methods for LogicNN
     def calc_rule_constraints(self, new_data=None, new_rule_fea=None):
         if new_rule_fea is None:
