@@ -3,17 +3,19 @@ import tensorflow as tf
 
 
 class LogicNN(object):
-    def __init__(self, input, network, rules=[], rule_lambda=[], pi=0., C=1.):
+    def __init__(self, input, network, rules=[], rule_lambda=[], pi=None, C=1.):
         """
         :param input: symbolic image tensor, of shape image_shape
         :param network: student network
         """
-        self.input = input
+        self.input = self.network.input_x
         self.network = network
         self.rules = rules
         self.rule_lambda = tf.constant(rule_lambda, dtype=tf.float32, name='rule_lambda')
         self.ones = tf.ones([len(rules)], name='ones', dtype=tf.float32)
-        self.pi = tf.constant(pi, shape=[1], name='pi', dtype=tf.float32)
+        self.pi = pi
+        # pi: how percentage listen to teacher loss,
+        #     starts from lower bound
         self.C = C
 
         ## q(y|x)
@@ -28,8 +30,8 @@ class LogicNN(object):
         dropout_q_y_given_x *= distr
 
         # normalize (dropout_q_y_given_x)
-        n = int(self.input.get_shape()[0])  #TODO: remove self.input, n
-        n_dropout_q_y_given_x = dropout_q_y_given_x / tf.reshape(tf.reduce_sum(dropout_q_y_given_x, axis=1), [n, 1])
+        batch_size = int(self.input.get_shape()[0])
+        n_dropout_q_y_given_x = dropout_q_y_given_x / tf.reshape(tf.reduce_sum(dropout_q_y_given_x, axis=1), [batch_size, 1])
         n_q_y_given_x = q_y_given_x / tf.reshape(tf.reduce_sum(q_y_given_x, axis=1), [n, 1])
         self.dropout_q_y_given_x = tf.stop_gradient(n_dropout_q_y_given_x)
         self.q_y_given_x = tf.stop_gradient(n_q_y_given_x)

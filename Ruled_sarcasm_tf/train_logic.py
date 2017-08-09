@@ -29,6 +29,7 @@ tf.flags.DEFINE_string("filter_sizes", "3,4,5", "Comma-separated filter sizes (d
 tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (default: 128)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 0.0)")
+tf.flags.DEFINE_string("pi_params", "0.95, 0", "parameters of pi: 'base of decay func, lower bound' (default: '0.95,0 ')")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 32, "Batch Size (default: 32)")
@@ -48,7 +49,7 @@ print("\nParameters:")
 for attr, value in sorted(FLAGS.__flags.items()):
     print("{}={}".format(attr.upper(), value))
 print("")
-
+FLAGS.pi_params = list(map(int, FLAGS.pi_params.split(",")))
 
 # Data Preparation
 # ==================================================
@@ -105,30 +106,32 @@ with tf.Graph().as_default():
         #      fea[0]   : 1 if x=x1_love_x2, 0 otherwise
         #      fea[1:2] : classifier.predict_p(x_2)
 
-        rule1_ind = tf.placeholder(tf.int32, [FLAGS.batch_size], name="rule1_ind")
-        rule1_senti = tf.placeholder(tf.int32, [FLAGS.batch_size], name="rule1_senti")
+        rule1_ind = tf.placeholder(tf.int32, [FLAGS.batch_size, 1], name="rule1_ind")
+        rule1_senti = tf.placeholder(tf.int32, [FLAGS.batch_size, 1], name="rule1_senti")
         rule1_rev = tf.ones_like(rule1_senti) - rule1_senti
         rule1_y_pred_p = tf.concatenate(rules_rev, rule1_senti, axis=1)
         rule1_full = tf.concatenate(rule1_ind, rule1_y_pred_p, axis=1)
-        
+
         # add logic layer
         nclasses = 2
         rules = [FOL_Rule1(nclasses, cnn.embedded_chars, f_rule1_full)]
         rule_lambda = [1]  # confidence for the "rule1" rule = 1
-        new_pi = get_pi(cur_iter=0, params=pi_params)  # TODO: handle pi changing
+        pi_holder = tf.placeholder(tf.float32, [1], name='pi')
+        # pi: how percentage listen to teacher loss,
+        #     starts from lower bound
 
         logic_nn = LogicNN(
             input=x,
             netwrok=cnn,
             rules=rules,
             rule_lambda=rule_lambda,
-            pi=new_pi,
+            pi=pi_holder,
             C=1.)
 
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
         optimizer = tf.train.AdamOptimizer(1e-3)
-        grads_and_vars = optimizer.compute_gradients(cnn.loss)
+        grads_and_vars = optimizer.compute_gradients(logic_nn.neg_log_liklihood)
         train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
         # Keep track of gradient values and sparsity (optional)
@@ -177,10 +180,15 @@ with tf.Graph().as_default():
             """
             A single training step
             """
+            cur_step = tf.train.global_step(sess, global_step)
+            cur_epoch = int(cur_step * 1.0 / FLAGS.batch_size)
+            pi = get_pi(cur_iter=cur_epoch, params=FLAGS.pi_params)
+
             feed_dict = {
                 logic_nn.network.input_x: x_batch,
                 logic_nn.network.input_y: y_batch,
-                logic_nn.network.dropout_keep_prob: FLAGS.dropout_keep_prob
+                logic_nn.network.dropout_keep_prob: FLAGS.dropout_keep_prob,
+                logic_nn.network.pi: pi
             }
             _, step, summaries, neg_log_liklihood, accuracy = sess.run(
                 [train_op, global_step, train_summary_op, logic_nn.neg_log_liklihood, logic_nn.network.accuracy],
@@ -206,6 +214,16 @@ with tf.Graph().as_default():
             print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
             if writer:
                 writer.add_summary(summaries, step)
+
+        def get_pi(cur_iter, params=None):
+            """
+            exponential decay: pi_t = max{1 - k^t, lb}
+            pi: how percentage listen to teacher loss,
+                starts from lower bound
+            """
+            k, lb = params[0], params[1]
+            pi = max([1. - k**cur_iter, float(lb)])
+            return pi
 
         # Batches Generator
         batches = data_helpers.batch_iter(
