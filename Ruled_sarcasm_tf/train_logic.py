@@ -114,11 +114,12 @@ with tf.Graph().as_default():
 
         # add logic layer
         nclasses = 2
-        rules = [FOL_Rule1(nclasses, cnn.embedded_chars, f_rule1_full)]
+        rules = [
+            FOL_Rule1(nclasses, cnn.embedded_chars, f_rule1_full)
+        ]
         rule_lambda = [1]  # confidence for the "rule1" rule = 1
         pi_holder = tf.placeholder(tf.float32, [1], name='pi')
-        # pi: how percentage listen to teacher loss,
-        #     starts from lower bound
+        # pi: how percentage listen to teacher loss, starts from lower bound
 
         logic_nn = LogicNN(
             input=x,
@@ -188,7 +189,9 @@ with tf.Graph().as_default():
                 logic_nn.network.input_x: x_batch,
                 logic_nn.network.input_y: y_batch,
                 logic_nn.network.dropout_keep_prob: FLAGS.dropout_keep_prob,
-                logic_nn.network.pi: pi
+                logic_nn.network.pi: pi,
+                rule1_ind: ,
+                rule1_senti:
             }
             _, step, summaries, neg_log_liklihood, accuracy = sess.run(
                 [train_op, global_step, train_summary_op, logic_nn.neg_log_liklihood, logic_nn.network.accuracy],
@@ -202,10 +205,17 @@ with tf.Graph().as_default():
             """
             Evaluates model on a dev set
             """
+            cur_step = tf.train.global_step(sess, global_step)
+            cur_epoch = int(cur_step * 1.0 / FLAGS.batch_size)
+            pi = get_pi(cur_iter=cur_epoch, params=FLAGS.pi_params)
+
             feed_dict = {
                 logic_nn.network.input_x: x_batch,
                 logic_nn.network.input_y: y_batch,
-                logic_nn.network.dropout_keep_prob: 1.0
+                logic_nn.network.dropout_keep_prob: 1.,
+                logic_nn.network.pi: pi,
+                rule1_ind: ,
+                rule1_senti: 
             }
             step, summaries, loss, accuracy = sess.run(
                 [global_step, dev_summary_op, logic_nn.network..loss, logic_nn.network.accuracy],

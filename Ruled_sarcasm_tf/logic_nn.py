@@ -10,21 +10,19 @@ class LogicNN(object):
         """
         self.input = self.network.input_x
         self.network = network
-        self.rules = rules
+        self.rules = rules  # rules[i].input / rules[i].fea are tf.place_holder
         self.rule_lambda = tf.constant(rule_lambda, dtype=tf.float32, name='rule_lambda')
         self.ones = tf.ones([len(rules)], name='ones', dtype=tf.float32)
         self.pi = pi
-        # pi: how percentage listen to teacher loss,
-        #     starts from lower bound
+        # pi: how percentage listen to teacher loss, starts from lower bound
         self.C = C
 
         ## q(y|x)
         # dropout_p_y_given_x: output of a LogisticRegression Layer (of a network)
-        dropout_q_y_given_x = self.network.h_drop_p * 1.0  # self.network.h_drop  = self.network.dropout_p_y_given_x
-        q_y_given_x = self.network.predict_p * 1.0  # self.network.predict_p  = self.network.p_y_given_x
+        dropout_q_y_given_x = self.network.h_drop_p * 1.  # self.network.h_drop  = self.network.dropout_p_y_given_x
+        q_y_given_x = self.network.predict_p * 1.  # self.network.predict_p  = self.network.p_y_given_x
         # combine rule constraints
-        distr = self.calc_rule_constraints(new_data=new_data, new_rule_fea=new_rule_fea)
-        # TODO: calc_rule_constraints() lack of input argument
+        distr = self.calc_rule_constraints()
 
         q_y_given_x *= distr
         dropout_q_y_given_x *= distr
@@ -42,12 +40,12 @@ class LogicNN(object):
         q_loss = tf.nn.softmax_cross_entropy_with_logits(logits=self.network.scores, labels=self.q_y_given_x)
         self.q_loss = tf.reduce_mean(q_loss)
 
-        self.neg_log_liklihood = (1.0 - self.pi) * self.network.loss + self.pi * self.q_loss
+        self.neg_log_liklihood = (1. - self.pi) * self.network.loss + self.pi * self.q_loss
 
         drop_q_loss = tf.nn.softmax_cross_entropy_with_logits(logits=self.network.h_drop, labels=self.q_y_given_x)
         self.drop_q_loss = tf.reduce_mean(drop_q_loss)
 
-        self.drop_neg_log_liklihood = (1.0 - self.pi) * self.network.drop_loss + self.pi * self.drop_q_loss
+        self.drop_neg_log_liklihood = (1. - self.pi) * self.network.drop_loss + self.pi * self.drop_q_loss
 
         # compute prediction as class whose probability is maximal in symbolic form
         # return LogicNN's q/p argmax predictions
@@ -56,19 +54,18 @@ class LogicNN(object):
 
         # return LogicNN's q/p prob. predictions
         self.p_y_pred_p = self.network.predict_p
-        self.q_y_pred_p = p_y_pred_p * self.calc_rule_constraints(new_data=new_data, new_rule_fea=new_rule_fea)
-        # TODO: calc_rule_constraints() lack of input argument
+        self.q_y_pred_p = p_y_pred_p * self.calc_rule_constraints()
 
         q_correct_predictions = tf.equal(self.q_y_pred, tf.argmax(self.network.input_y, 1))
         self.q_accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="q_accuracy")
 
     # methods for LogicNN
-    def calc_rule_constraints(self, new_data=None, new_rule_fea=None):
+    def calc_rule_constraints(self):
         if new_rule_fea is None:
             new_rule_fea = [None] * len(self.rules)
         distr_all = tf.zeros(shape=[1], dtype=tf.float32)  # will be broadcast
         for i, rule in enumerate(self.rules):
-            distr = rule.log_distribution(self.C * self.rule_lambda[i], new_data, new_rule_fea[i])
+            distr = rule.log_distribution(self.C * self.rule_lambda[i], rule.input, rule.fea)
             distr_all += distr
         distr_all += distr
         #
@@ -78,9 +75,3 @@ class LogicNN(object):
         distr_all -= distr_y0_copies
         distr_all = tf.maximum(tf.minimum(distr_all, 60.), -60.)  # truncate to avoid over-/under-flow
         return tf.exp(distr_all)
-
-    # def set_pi(self, new_pi):
-    #     self.pi.set_value(new_pi)
-
-    # def get_pi(self):
-    #     return self.pi.get_value()
