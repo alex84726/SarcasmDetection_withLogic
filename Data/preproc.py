@@ -1,10 +1,10 @@
 """ This functions cleans all the tweets.
-It first removes all the #tags, then make sure the tweets
-does not contain http links, non ASCII charaters or that the
-first letter of the tweet is @ (to ensure that the tweet is not out of context).
+It first removes all the #tags, then make sure the tweets does not contain http links,
+non ASCII charaters or that the first letter of the tweet is @ (to ensure that the tweet is not out of context).
 Then it removes any @tagging and any mention of the word sarcasm or sarcastic.
 If after this the tweet is not empty and contains at least 3 words, it is added to the list.
-Finally, duplicate tweets are removed. """
+Finally, duplicate tweets are removed.
+"""
 
 import csv
 import re
@@ -13,6 +13,7 @@ import nltk
 import numpy as np
 
 import enchant
+
 
 def preprocessing(csv_file_object):
 
@@ -36,8 +37,7 @@ def preprocessing(csv_file_object):
                 temp = temp[0:-2]
                 print(temp)
                 temp = temp.decode('string_escape')
-            if (len(temp) > 0) and ('http' not in temp) and (
-                    '@' not in temp) and ('\u' not in temp):
+            if (len(temp) > 0) and ('http' not in temp) and ('@' not in temp) and ('\u' not in temp):
                 temp = temp.encode('utf8')
                 temp = remove_friendtag.sub('', temp)
                 temp = remove_sarcasm.sub('', temp)
