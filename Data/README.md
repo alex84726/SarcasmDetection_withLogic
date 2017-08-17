@@ -9,10 +9,12 @@
   ```
   python2 preproc.py
   ```
-  then, we got 
+  then, we got
   ```
-  sarcasm_data_proc.npy and nonsarc_data_proc.npy 
+  sarcasm_data_proc.npy and nonsarc_data_proc.npy
   ```
   as the final dataset to run the program
 
-# label_sarcasm : twitter txt splict into 3-folds for mannual labeling  
+# label_sarcasm : twitter txt splitted into 3-folds for mannual labeling  
+
+# GoogleNews-vectors-negative300.bin.gz: pre-trained word2vector download from https://code.google.com/archive/p/word2vec/
