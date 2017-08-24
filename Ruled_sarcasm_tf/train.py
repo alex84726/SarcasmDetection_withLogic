@@ -8,10 +8,9 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import learn
 
-
 import data_helpers
+from gensim.models.keyedvectors import KeyedVectors
 from text_cnn import TextCNN
-
 
 # Parameters
 # ==================================================
@@ -28,6 +27,7 @@ tf.flags.DEFINE_string("filter_sizes", "3,4,5", "Comma-separated filter sizes (d
 tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (default: 128)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 0.0)")
+tf.flags.DEFINE_boolean("word2vec", False, "Using pre-trained word2vec as initializer (default: False)")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 32, "Batch Size (default: 32)")
@@ -59,8 +59,42 @@ x_text, y = data_helpers.load_npy_data(FLAGS.data_file)
 
 # Build vocabulary
 max_document_length = max([len(x.split(' ')) for x in x_text])
-vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
+
+
+def _identity(iterator):
+    # iterator: Input iterator with strings.
+    for value in iterator:
+        yield value.split()
+
+
+vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn=_identity)
+
+if FLAGS.word2vec:
+    #  Load Google word2vector
+    print("Loading word embeddings ...")
+    w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
+    pre_w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+
+    vocab = list(pre_w2v.vocab.keys())
+    vocab_processor.fit(vocab)  # intial by Google word2vector
+    vocab_processor.vocabulary_.freeze(freeze=False)  # Allow adding new words from Training data
+    pre_vocab = list(vocab_processor.vocabulary_._mapping.keys()).copy()
+
 x = np.array(list(vocab_processor.fit_transform(x_text)))
+
+if FLAGS.word2vec:
+    embed = [np.zeros([FLAGS.embedding_dim])]  # embedding for '<UNK>' at index 0
+    for vocab_single in pre_vocab:
+        if vocab_single != vocab_processor.vocabulary_._unknown_token:
+            embed.append(pre_w2v.wv[vocab_single])
+    embed = np.asarray(embed)
+    num_new_word = len(vocab_processor.vocabulary_) - len(pre_vocab)
+    # embedding for new words
+    embed = np.concatenate((embed, np.random.randn(num_new_word, FLAGS.embedding_dim)), axis=0)
+
+    del pre_w2v
+    del vocab
+    del pre_vocab
 
 # Randomly shuffle data
 # np.random.seed(10)
@@ -146,6 +180,14 @@ with tf.Graph().as_default():
 
         # Initialize all variables
         sess.run(tf.global_variables_initializer())
+
+        #  Use pre-trained word2vec as initializer
+        if FLAGS.word2vec:
+            embedding_placeholder = tf.placeholder(
+                tf.float32, [len(vocab_processor.vocabulary_), FLAGS.embedding_dim])
+            embedding_init = cnn.W.assign(embedding_placeholder)
+            sess.run(embedding_init, feed_dict={embedding_placeholder: embed})
+            # del embed
 
         def train_step(x_batch, y_batch):
             """
