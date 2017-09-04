@@ -190,8 +190,8 @@ with tf.Graph().as_default():
                 logic_nn.network.input_y: y_batch,
                 logic_nn.network.dropout_keep_prob: FLAGS.dropout_keep_prob,
                 logic_nn.network.pi: pi,
-                rule1_ind: ,
-                rule1_senti:
+                rule1_ind: ,  # TODO
+                rule1_senti:  # TODO
             }
             _, step, summaries, neg_log_liklihood, accuracy = sess.run(
                 [train_op, global_step, train_summary_op, logic_nn.neg_log_liklihood, logic_nn.network.accuracy],
@@ -214,11 +214,11 @@ with tf.Graph().as_default():
                 logic_nn.network.input_y: y_batch,
                 logic_nn.network.dropout_keep_prob: 1.,
                 logic_nn.network.pi: pi,
-                rule1_ind: ,
-                rule1_senti: 
+                rule1_ind: ,  # TODO
+                rule1_senti:  # TODO
             }
             step, summaries, loss, accuracy = sess.run(
-                [global_step, dev_summary_op, logic_nn.network..loss, logic_nn.network.accuracy],
+                [global_step, dev_summary_op, logic_nn.network.loss, logic_nn.network.accuracy],
                 feed_dict)
             time_str = datetime.datetime.now().isoformat()
             print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))

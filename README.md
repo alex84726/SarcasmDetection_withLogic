@@ -13,3 +13,12 @@ We use logic patterns discovered by linguists to do sarcasm detection with neura
 
 ## Other
 
+
+============================
+Todo List:
+- check whether pre-trained embedding is right
+- pre-process sentiment analysis(Stanford NLP), generate sentiment label
+  Maybe modify Preprocess_files/logicnn_features.py
+
+- feed sentiment label to "freed_dict" in train_logic.py
+- check whether first-order-logic is right

@@ -15,6 +15,12 @@
   ```
   as the final dataset to run the program
 
+# select_test.py
+  split dataset into training  set and testing set
+  ```
+  python2 select_test.py
+  ```
+
 # label_sarcasm : twitter txt splitted into 3-folds for mannual labeling  
 
 # GoogleNews-vectors-negative300.bin.gz: pre-trained word2vector download from https://code.google.com/archive/p/word2vec/
