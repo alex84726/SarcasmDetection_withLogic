@@ -24,7 +24,8 @@ class TextCNN(object):
                 "W",
                 initializer=tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0))
             self.embedded_chars = tf.nn.embedding_lookup(self.W, self.input_x)
-            self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1)  # size:  [None, sequence_length, embedding_size, 1]
+            self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1) 
+            # size:  [None, sequence_length, embedding_size, 1]
 
         # Create a convolution + maxpool layer for each filter size
         pooled_outputs = []
