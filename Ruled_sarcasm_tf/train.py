@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/bin/env python3
 
 import datetime
 import os
@@ -91,7 +91,6 @@ if FLAGS.word2vec:
     num_new_word = len(vocab_processor.vocabulary_) - len(pre_vocab)
     # embedding for new words
     embed = np.concatenate((embed, np.random.randn(num_new_word, FLAGS.embedding_dim)), axis=0)
-
     del pre_w2v
     del vocab
     del pre_vocab
@@ -121,7 +120,9 @@ with tf.Graph().as_default():
     session_conf = tf.ConfigProto(
         gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_usage),
         allow_soft_placement=FLAGS.allow_soft_placement,
-        log_device_placement=FLAGS.log_device_placement)
+        log_device_placement=FLAGS.log_device_placement,
+    )
+    session_conf.gpu_options.allocator_type = 'BFC'
     sess = tf.Session(config=session_conf)
     with sess.as_default():
         cnn = TextCNN(
@@ -183,11 +184,13 @@ with tf.Graph().as_default():
 
         #  Use pre-trained word2vec as initializer
         if FLAGS.word2vec:
-            embedding_placeholder = tf.placeholder(
-                tf.float32, [len(vocab_processor.vocabulary_), FLAGS.embedding_dim])
+            # import pdb; pdb.set_trace()
+            with tf.device('/cpu:0'):
+                embedding_placeholder = tf.placeholder(
+                    tf.float32, [len(vocab_processor.vocabulary_), FLAGS.embedding_dim])
             embedding_init = cnn.W.assign(embedding_placeholder)
             sess.run(embedding_init, feed_dict={embedding_placeholder: embed})
-            # del embed
+        del embed
 
         def train_step(x_batch, y_batch):
             """
