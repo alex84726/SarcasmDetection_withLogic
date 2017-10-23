@@ -87,7 +87,7 @@ def extract_rule1(revs):
                             'outputFormat': 'json'})
             senti_res = (int(res["sentences"][0]["sentimentValue"]) - 1) / 2.0 if res["sentences"] != [] else 0.5
             senti_ori = (int(ori["sentences"][0]["sentimentValue"]) - 1) / 2.0 if ori["sentences"] != [] else 0.5
-            rule1_senti.append(senti_ori-senti_res)
+            rule1_senti.append((senti_ori-senti_res)*0.5+0.5)
             print('Found \'love\'. Finish annotation.')
         else:
             rule1_ind.append(0)
