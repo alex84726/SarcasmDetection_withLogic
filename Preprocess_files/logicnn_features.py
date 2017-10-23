@@ -80,8 +80,14 @@ def extract_rule1(revs):
                 fea,
                 properties={'annotators': 'sentiment',
                             'outputFormat': 'json'})
-            senti = (int(res["sentences"][0]["sentimentValue"]) - 1) / 2.0 if res["sentences"] != [] else 0.5
-            rule1_senti.append(senti)
+
+            ori = nlp.annotate(
+                text,
+                properties={'annotators': 'sentiment',
+                            'outputFormat': 'json'})
+            senti_res = (int(res["sentences"][0]["sentimentValue"]) - 1) / 2.0 if res["sentences"] != [] else 0.5
+            senti_ori = (int(ori["sentences"][0]["sentimentValue"]) - 1) / 2.0 if ori["sentences"] != [] else 0.5
+            rule1_senti.append(senti_ori-senti_res)
             print('Found \'love\'. Finish annotation.')
         else:
             rule1_ind.append(0)
