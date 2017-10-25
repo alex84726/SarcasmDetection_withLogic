@@ -193,5 +193,5 @@ def extract_rule_ibm(revs, tone_analyzer):
 
 
 if __name__ == "__main__":
-    main()
-    #ibm()
+    #main()
+    ibm()
