@@ -1,11 +1,11 @@
 """
 Rule feature extractor
 """
-from os.path import splitext
 import re
-import sys
 import warnings
+import sys
 from collections import OrderedDict, defaultdict
+from os.path import splitext
 
 import numpy as np
 
@@ -16,6 +16,7 @@ from pycorenlp import StanfordCoreNLP
 nlp = StanfordCoreNLP('http://localhost:9000')
 
 warnings.filterwarnings("ignore")
+
 
 
 def main():
