@@ -8,10 +8,11 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import learn
 
-
 import data_helpers
-from text_cnn import TextCNN
+from fol import FOL_Rule1
+from gensim.models.keyedvectors import KeyedVectors
 from logic_nn import LogicNN
+from text_cnn import TextCNN
 
 
 # Parameters
@@ -22,6 +23,7 @@ tf.flags.DEFINE_float("dev_sample_percentage", 0.04, "Percentage of the training
 tf.flags.DEFINE_string("positive_data_file", "../Data/sarcasm_data_proc.npy", "Data source for the positive data.")
 tf.flags.DEFINE_string("negative_data_file", "../Data/nonsarc_data_proc.npy", "Data source for the negative data.")
 tf.flags.DEFINE_string("data_file", "../Data/train_balanced.npy", "Data source for the training data.")
+tf.flags.DEFINE_string("fea_file", "../Data/train_balanced.fea.npy", "Data source for the training feature data.")
 
 # Model Hyperparameters
 tf.flags.DEFINE_integer("embedding_dim", 128, "Dimensionality of character embedding (default: 128)")
@@ -29,6 +31,7 @@ tf.flags.DEFINE_string("filter_sizes", "3,4,5", "Comma-separated filter sizes (d
 tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (default: 128)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 0.0)")
+tf.flags.DEFINE_boolean("word2vec", False, "Using pre-trained word2vec as initializer (default: False)")
 tf.flags.DEFINE_string("pi_params", "0.95, 0", "parameters of pi: 'base of decay func, lower bound' (default: '0.95,0 ')")
 
 # Training parameters
@@ -49,7 +52,7 @@ print("\nParameters:")
 for attr, value in sorted(FLAGS.__flags.items()):
     print("{}={}".format(attr.upper(), value))
 print("")
-FLAGS.pi_params = list(map(int, FLAGS.pi_params.split(",")))
+FLAGS.pi_params = list(map(float, FLAGS.pi_params.split(",")))
 
 # Data Preparation
 # ==================================================
@@ -58,11 +61,46 @@ FLAGS.pi_params = list(map(int, FLAGS.pi_params.split(",")))
 print("Loading data...")
 # x_text, y = data_helpers.load_data_and_labels(FLAGS.positive_data_file, FLAGS.negative_data_file)
 x_text, y = data_helpers.load_npy_data(FLAGS.data_file)
+x_fea = np.load(FLAGS.fea_file).item()
 
 # Build vocabulary
 max_document_length = max([len(x.split(' ')) for x in x_text])
-vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
+
+
+def _identity(iterator):
+    # iterator: Input iterator with strings.
+    for value in iterator:
+        yield value.split()
+
+
+vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn=_identity)
+
+if FLAGS.word2vec:
+    #  Load Google word2vector
+    print("Loading word embeddings ...")
+    w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
+    pre_w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+
+    vocab = list(pre_w2v.vocab.keys())
+    vocab_processor.fit(vocab)  # intial by Google word2vector
+    vocab_processor.vocabulary_.freeze(freeze=False)  # Allow adding new words from Training data
+    pre_vocab = list(vocab_processor.vocabulary_._mapping.keys()).copy()
+
 x = np.array(list(vocab_processor.fit_transform(x_text)))
+
+if FLAGS.word2vec:
+    print("Create w2v numpy vector")
+    embed = [np.zeros([FLAGS.embedding_dim])]  # embedding for '<UNK>' at index 0
+    for vocab_single in pre_vocab:
+        if vocab_single != vocab_processor.vocabulary_._unknown_token:
+            embed.append(pre_w2v.wv[vocab_single])
+    embed = np.asarray(embed)
+    num_new_word = len(vocab_processor.vocabulary_) - len(pre_vocab)
+    # embedding for new words
+    embed = np.concatenate((embed, np.random.randn(num_new_word, FLAGS.embedding_dim)), axis=0)
+    del pre_w2v
+    del vocab
+    del pre_vocab
 
 # Randomly shuffle data
 # np.random.seed(10)
@@ -78,6 +116,11 @@ y_shuffled = y
 dev_sample_index = -1 * int(FLAGS.dev_sample_percentage * float(len(y)))
 x_train, x_dev = x_shuffled[:dev_sample_index], x_shuffled[dev_sample_index:]
 y_train, y_dev = y_shuffled[:dev_sample_index], y_shuffled[dev_sample_index:]
+x_fea_train = {}
+x_fea_dev = {}
+for k, v in x_fea.items():
+    x_fea_train[k] = v[:dev_sample_index]
+    x_fea_dev[k] = v[dev_sample_index:]
 print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
 print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
 
@@ -106,24 +149,23 @@ with tf.Graph().as_default():
         #      fea[0]   : 1 if x=x1_love_x2, 0 otherwise
         #      fea[1:2] : classifier.predict_p(x_2)
 
-        rule1_ind = tf.placeholder(tf.int32, [FLAGS.batch_size, 1], name="rule1_ind")
-        rule1_senti = tf.placeholder(tf.int32, [FLAGS.batch_size, 1], name="rule1_senti")
+        rule1_ind = tf.placeholder(tf.int32, [None, 1], name="rule1_ind")
+        rule1_senti = tf.placeholder(tf.int32, [None, 1], name="rule1_senti")
         rule1_rev = tf.ones_like(rule1_senti) - rule1_senti
-        rule1_y_pred_p = tf.concatenate(rules_rev, rule1_senti, axis=1)
-        rule1_full = tf.concatenate(rule1_ind, rule1_y_pred_p, axis=1)
-
+        rule1_y_pred_p = tf.concat([rule1_rev, rule1_senti], axis=1)
+        rule1_full = tf.concat([rule1_ind, rule1_y_pred_p], axis=1)
         # add logic layer
         nclasses = 2
+        Rule_input = cnn.embedded_chars
         rules = [
-            FOL_Rule1(nclasses, cnn.embedded_chars, f_rule1_full)
+            FOL_Rule1(nclasses, Rule_input, rule1_full),
         ]
         rule_lambda = [1]  # confidence for the "rule1" rule = 1
         pi_holder = tf.placeholder(tf.float32, [1], name='pi')
         # pi: how percentage listen to teacher loss, starts from lower bound
 
         logic_nn = LogicNN(
-            input=x,
-            netwrok=cnn,
+            network=cnn,
             rules=rules,
             rule_lambda=rule_lambda,
             pi=pi_holder,
@@ -151,16 +193,27 @@ with tf.Graph().as_default():
         print("Writing to {}\n".format(out_dir))
 
         # Summaries for loss and accuracy
-        loss_summary = tf.summary.scalar("loss", cnn.loss)
-        acc_summary = tf.summary.scalar("accuracy", cnn.accuracy)
+        p_loss_summary = tf.summary.scalar("p_loss", cnn.loss)
+        p_acc_summary = tf.summary.scalar("p_accuracy", cnn.accuracy)
+        q_loss_summary = tf.summary.scalar("q_loss", logic_nn.q_loss)
+        q_acc_summary = tf.summary.scalar("q_accuracy", logic_nn.q_accuracy)
+        pi_summary = tf.summary.scalar("pi", logic_nn.pi)
+        nlld_summmary = tf.summary.scalar("neg_log_liklihood", logic_nn.neg_log_liklihood[()])
 
         # Train Summaries
-        train_summary_op = tf.summary.merge([loss_summary, acc_summary, grad_summaries_merged])
+        train_summary_op = tf.summary.merge([
+            p_loss_summary, p_acc_summary,
+            q_loss_summary, q_acc_summary, pi_summary, nlld_summmary,
+            grad_summaries_merged,
+        ])
         train_summary_dir = os.path.join(out_dir, "summaries", "train")
         train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
 
         # Dev summaries
-        dev_summary_op = tf.summary.merge([loss_summary, acc_summary])
+        dev_summary_op = tf.summary.merge([
+            p_loss_summary, p_acc_summary,
+            q_loss_summary, q_acc_summary, pi_summary, nlld_summmary,
+        ])
         dev_summary_dir = os.path.join(out_dir, "summaries", "dev")
         dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, sess.graph)
 
@@ -177,7 +230,16 @@ with tf.Graph().as_default():
         # Initialize all variables
         sess.run(tf.global_variables_initializer())
 
-        def train_step(x_batch, y_batch):
+        #  Use pre-trained word2vec as initializer
+        if FLAGS.word2vec:
+            with tf.device('/cpu:0'):
+                embedding_placeholder = tf.placeholder(
+                    tf.float32, [len(vocab_processor.vocabulary_), FLAGS.embedding_dim])
+            embedding_init = cnn.W.assign(embedding_placeholder)
+            sess.run(embedding_init, feed_dict={embedding_placeholder: embed})
+        del embed
+
+        def train_step(x_batch, y_batch, x_fea_batch):
             """
             A single training step
             """
@@ -189,19 +251,20 @@ with tf.Graph().as_default():
                 logic_nn.network.input_x: x_batch,
                 logic_nn.network.input_y: y_batch,
                 logic_nn.network.dropout_keep_prob: FLAGS.dropout_keep_prob,
-                logic_nn.network.pi: pi,
-                rule1_ind: ,  # TODO
-                rule1_senti:  # TODO
+                logic_nn.pi: pi,
+                rule1_ind: np.expand_dims(x_fea_batch["rule1_ind"], 1),
+                rule1_senti: np.expand_dims(x_fea_batch["rule1_senti"], 1),
             }
             _, step, summaries, neg_log_liklihood, accuracy = sess.run(
                 [train_op, global_step, train_summary_op, logic_nn.neg_log_liklihood, logic_nn.network.accuracy],
                 feed_dict)
             time_str = datetime.datetime.now().isoformat()
             # if step % FLAGS.evaluate_every == 0:
-            print("{}: step {}, nlld {:g}, acc {:g}".format(time_str, step, neg_log_liklihood, accuracy))
+            # print("{}: step {}, nlld {:g}, acc {:g}".format(time_str, step, neg_log_liklihood, accuracy))
+            print("{}: step {}, nlld {}, acc {:g}".format(time_str, step, neg_log_liklihood, accuracy))
             train_summary_writer.add_summary(summaries, step)
 
-        def dev_step(x_batch, y_batch, writer=None):
+        def dev_step(x_batch, y_batch, x_fea_batch, writer=None):
             """
             Evaluates model on a dev set
             """
@@ -213,9 +276,9 @@ with tf.Graph().as_default():
                 logic_nn.network.input_x: x_batch,
                 logic_nn.network.input_y: y_batch,
                 logic_nn.network.dropout_keep_prob: 1.,
-                logic_nn.network.pi: pi,
-                rule1_ind: ,  # TODO
-                rule1_senti:  # TODO
+                logic_nn.pi: pi,
+                rule1_ind: np.expand_dims(x_fea_batch["rule1_ind"], 1),
+                rule1_senti: np.expand_dims(x_fea_batch["rule1_senti"], 1),
             }
             step, summaries, loss, accuracy = sess.run(
                 [global_step, dev_summary_op, logic_nn.network.loss, logic_nn.network.accuracy],
@@ -236,17 +299,18 @@ with tf.Graph().as_default():
             return pi
 
         # Batches Generator
-        batches = data_helpers.batch_iter(
-            list(zip(x_train, y_train)), FLAGS.batch_size, FLAGS.num_epochs)
+        batches = data_helpers.batch_fea_iter(
+            list(zip(x_train, y_train)), x_fea_train, FLAGS.batch_size, FLAGS.num_epochs)
 
         # Training loop. For each batch...
         for batch in batches:
+            batch, x_fea_batch = batch
             x_batch, y_batch = zip(*batch)
-            train_step(x_batch, y_batch)
+            train_step(x_batch, y_batch, x_fea_batch)
             current_step = tf.train.global_step(sess, global_step)
             if current_step % FLAGS.evaluate_every == 0:
                 print("\nEvaluation:")
-                dev_step(x_dev, y_dev, writer=dev_summary_writer)
+                dev_step(x_dev, y_dev, x_fea_dev, writer=dev_summary_writer)
                 print("")
             if current_step % FLAGS.checkpoint_every == 0:
                 path = saver.save(sess, checkpoint_prefix, global_step=current_step)
