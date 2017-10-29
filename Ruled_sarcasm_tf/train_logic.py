@@ -32,7 +32,8 @@ tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 0.0)")
 tf.flags.DEFINE_boolean("word2vec", False, "Using pre-trained word2vec as initializer (default: False)")
-tf.flags.DEFINE_string("pi_params", "0.95, 0", "parameters of pi: 'base of decay func, lower bound' (default: '0.95,0 ')")
+tf.flags.DEFINE_string("pi_params", "0.95,0", "parameters of pi: 'base of decay func, lower bound' (default: '0.95,0 ')")
+tf.flags.DEFINE_string("pi_curve", "exp_arise", "type of pi change curve: exp_arise, exp_decay,linear_arise, linear_decay (default: exp_arise)")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 32, "Batch Size (default: 32)")
@@ -245,7 +246,10 @@ with tf.Graph().as_default():
             """
             cur_step = tf.train.global_step(sess, global_step)
             cur_epoch = int(cur_step * 1.0 / FLAGS.batch_size)
-            pi = get_pi(cur_iter=cur_epoch, params=FLAGS.pi_params)
+            pi = get_pi(cur_iter=cur_epoch,
+                        params=FLAGS.pi_params,
+                        curve=FLAGS.pi_curve,
+                        data_len=x_train.shape[0],)
 
             feed_dict = {
                 logic_nn.network.input_x: x_batch,
@@ -261,7 +265,7 @@ with tf.Graph().as_default():
             time_str = datetime.datetime.now().isoformat()
             # if step % FLAGS.evaluate_every == 0:
             # print("{}: step {}, nlld {:g}, acc {:g}".format(time_str, step, neg_log_liklihood, accuracy))
-            print("{}: step {}, nlld {}, acc {:g}".format(time_str, step, neg_log_liklihood, accuracy))
+            # print("{}: step {}, nlld {}, acc {:g}".format(time_str, step, neg_log_liklihood, accuracy))
             train_summary_writer.add_summary(summaries, step)
 
         def dev_step(x_batch, y_batch, x_fea_batch, writer=None):
@@ -270,7 +274,10 @@ with tf.Graph().as_default():
             """
             cur_step = tf.train.global_step(sess, global_step)
             cur_epoch = int(cur_step * 1.0 / FLAGS.batch_size)
-            pi = get_pi(cur_iter=cur_epoch, params=FLAGS.pi_params)
+            pi = get_pi(cur_iter=cur_epoch,
+                        params=FLAGS.pi_params,
+                        curve=FLAGS.pi_curve,
+                        data_len=x_train.shape[0],)
 
             feed_dict = {
                 logic_nn.network.input_x: x_batch,
@@ -288,14 +295,26 @@ with tf.Graph().as_default():
             if writer:
                 writer.add_summary(summaries, step)
 
-        def get_pi(cur_iter, params=None):
+        def get_pi(cur_iter, params=None, curve='exp_arise', data_len=None):
             """
-            exponential decay: pi_t = max{1 - k^t, lb}
             pi: how percentage listen to teacher loss,
                 starts from lower bound
             """
             k, lb = params[0], params[1]
-            pi = max([1. - k**cur_iter, float(lb)])
+            if curve == 'exp_arise':
+                """exponential arise: pi_t = max{1 - k^t, lb}"""
+                pi = max([1. - k**cur_iter, float(lb)])
+            elif curve == 'exp_decay':
+                """exponential decay: pi_t = max{k^t, lb}"""
+                pi = max([k**cur_iter, float(lb)])
+            elif curve == 'linear_arise':
+                """ linear arise : pi_t = t / num_of_steps"""
+                num_batches_per_epoch = int((data_len - 1) / FLAGS.batch_size) + 1
+                pi = max(cur_iter / (num_batches_per_epoch * FLAGS.num_epochs), lb)
+            elif curve == 'linear_decay':
+                """ linear decay : pi_t = 1 - t / num_of_steps"""
+                num_batches_per_epoch = int((data_len - 1) / FLAGS.batch_size) + 1
+                pi = max(1 - cur_iter / (num_batches_per_epoch * FLAGS.num_epochs), lb)
             return pi
 
         # Batches Generator
