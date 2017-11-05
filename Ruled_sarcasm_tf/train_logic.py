@@ -303,7 +303,7 @@ with tf.Graph().as_default():
             k, lb = params[0], params[1]
             if curve == 'exp_arise':
                 """exponential arise: pi_t = max{1 - k^t, lb}"""
-                pi = max([1. - k**cur_iter, float(lb)])
+                pi = max([1. - k**(cur_iter*10), float(lb)])
             elif curve == 'exp_decay':
                 """exponential decay: pi_t = max{k^t, lb}"""
                 pi = max([k**cur_iter, float(lb)])
