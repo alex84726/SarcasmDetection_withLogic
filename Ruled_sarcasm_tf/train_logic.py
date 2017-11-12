@@ -14,12 +14,16 @@ from gensim.models.keyedvectors import KeyedVectors
 from logic_nn import LogicNN
 from text_cnn import TextCNN
 
+try:
+    import cPicle as pickle
+except:
+    import pickle
 
 # Parameters
 # ==================================================
 
 # Data loading params
-tf.flags.DEFINE_float("dev_sample_percentage", 0.04, "Percentage of the training data to use for validation")
+tf.flags.DEFINE_float("dev_sample_percentage", 0.1, "Percentage of the training data to use for validation")
 tf.flags.DEFINE_string("positive_data_file", "../Data/sarcasm_data_proc.npy", "Data source for the positive data.")
 tf.flags.DEFINE_string("negative_data_file", "../Data/nonsarc_data_proc.npy", "Data source for the negative data.")
 tf.flags.DEFINE_string("data_file", "../Data/train_balanced.npy", "Data source for the training data.")
@@ -60,69 +64,92 @@ FLAGS.pi_params = list(map(float, FLAGS.pi_params.split(",")))
 
 # Load data
 print("Loading data...")
-# x_text, y = data_helpers.load_data_and_labels(FLAGS.positive_data_file, FLAGS.negative_data_file)
 x_text, y = data_helpers.load_npy_data(FLAGS.data_file)
 x_fea = np.load(FLAGS.fea_file).item()
 
+print("Loading word embeddings ...")
+w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
+w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+
 # Build vocabulary
 max_document_length = max([len(x.split(' ')) for x in x_text])
+vocabs = set()
+
+print("Transform raw text to word_vectors")
+UNK_embed = np.zeros(w2v.vector_size)
+x_w2v = [s.split() for s in x_text]
+for i, s in enumerate(x_w2v):
+    orign_len = len(s)
+    for j, w in enumerate(s):
+        try:
+            s[j] = w2v[w]
+            vocabs.add(w)
+        except KeyError as err:
+            # print(err)
+            s[j] = UNK_embed
+    if len(s) < max_document_length:
+        s = s + [UNK_embed] * (max_document_length - len(s))
+    x_w2v[i] = s
+x_w2v = np.asarray(x_w2v)
 
 
-def _identity(iterator):
-    # iterator: Input iterator with strings.
-    for value in iterator:
-        yield value.split()
+# def _identity(iterator):
+#     # iterator: Input iterator with strings.
+#     for value in iterator:
+#         yield value.split()
+#
+#
+# vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn=_identity)
+#
+# if FLAGS.word2vec:
+#     #  Load Google word2vector
+#     print("Loading word embeddings ...")
+#     w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
+#     pre_w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+#
+#     vocab = list(pre_w2v.vocab.keys())
+#     vocab_processor.fit(vocab)  # intial by Google word2vector
+#     vocab_processor.vocabulary_.freeze(freeze=False)  # Allow adding new words from Training data
+#     pre_vocab = list(vocab_processor.vocabulary_._mapping.keys()).copy()
+#
+# x = np.array(list(vocab_processor.fit_transform(x_text)))
+#
+# if FLAGS.word2vec:
+#     print("Create w2v numpy vector")
+#     embed = [np.zeros([FLAGS.embedding_dim])]  # embedding for '<UNK>' at index 0
+#     for vocab_single in pre_vocab:
+#         if vocab_single != vocab_processor.vocabulary_._unknown_token:
+#             embed.append(pre_w2v.wv[vocab_single])
+#     embed = np.asarray(embed)
+#     num_new_word = len(vocab_processor.vocabulary_) - len(pre_vocab)
+#     # embedding for new words
+#     embed = np.concatenate((embed, np.random.randn(num_new_word, FLAGS.embedding_dim)), axis=0)
+#     del pre_w2v
+#     del vocab
+#     del pre_vocab
+#
+# # Randomly shuffle data
+# # np.random.seed(10)
+# # shuffle_indices = np.random.permutation(np.arange(len(y)))
+# # x_shuffled = x[shuffle_indices]
+# # y_shuffled = y[shuffle_indices]
+#
+# x_shuffled = x
+# y_shuffled = y
 
-
-vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn=_identity)
-
-if FLAGS.word2vec:
-    #  Load Google word2vector
-    print("Loading word embeddings ...")
-    w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
-    pre_w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
-
-    vocab = list(pre_w2v.vocab.keys())
-    vocab_processor.fit(vocab)  # intial by Google word2vector
-    vocab_processor.vocabulary_.freeze(freeze=False)  # Allow adding new words from Training data
-    pre_vocab = list(vocab_processor.vocabulary_._mapping.keys()).copy()
-
-x = np.array(list(vocab_processor.fit_transform(x_text)))
-
-if FLAGS.word2vec:
-    print("Create w2v numpy vector")
-    embed = [np.zeros([FLAGS.embedding_dim])]  # embedding for '<UNK>' at index 0
-    for vocab_single in pre_vocab:
-        if vocab_single != vocab_processor.vocabulary_._unknown_token:
-            embed.append(pre_w2v.wv[vocab_single])
-    embed = np.asarray(embed)
-    num_new_word = len(vocab_processor.vocabulary_) - len(pre_vocab)
-    # embedding for new words
-    embed = np.concatenate((embed, np.random.randn(num_new_word, FLAGS.embedding_dim)), axis=0)
-    del pre_w2v
-    del vocab
-    del pre_vocab
-
-# Randomly shuffle data
-# np.random.seed(10)
-# shuffle_indices = np.random.permutation(np.arange(len(y)))
-# x_shuffled = x[shuffle_indices]
-# y_shuffled = y[shuffle_indices]
-
-x_shuffled = x
-y_shuffled = y
-
-# Split train/test set
+# Split train/dev set
 # TODO: This is very crude, should use cross-validation
+print("Split train and dev sets")
 dev_sample_index = -1 * int(FLAGS.dev_sample_percentage * float(len(y)))
-x_train, x_dev = x_shuffled[:dev_sample_index], x_shuffled[dev_sample_index:]
-y_train, y_dev = y_shuffled[:dev_sample_index], y_shuffled[dev_sample_index:]
+x_train, x_dev = x_w2v[:dev_sample_index], x_w2v[dev_sample_index:]
+y_train, y_dev = y[:dev_sample_index], y[dev_sample_index:]
 x_fea_train = {}
 x_fea_dev = {}
 for k, v in x_fea.items():
     x_fea_train[k] = v[:dev_sample_index]
     x_fea_dev[k] = v[dev_sample_index:]
-print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
+print("Vocabulary Size: {:d}".format(len(vocabs) + 1))  # plus one vecause of unknown
+# print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
 print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
 
 
@@ -139,7 +166,7 @@ with tf.Graph().as_default():
         cnn = TextCNN(
             sequence_length=x_train.shape[1],
             num_classes=y_train.shape[1],
-            vocab_size=len(vocab_processor.vocabulary_),
+            # vocab_size=len(vocab_processor.vocabulary_),
             embedding_size=FLAGS.embedding_dim,
             filter_sizes=list(map(int, FLAGS.filter_sizes.split(","))),
             num_filters=FLAGS.num_filters,
@@ -157,7 +184,8 @@ with tf.Graph().as_default():
         rule1_full = tf.concat([rule1_ind, rule1_y_pred_p], axis=1)
         # add logic layer
         nclasses = 2
-        Rule_input = cnn.embedded_chars
+        # Rule_input = cnn.embedded_chars
+        Rule_input = cnn.input_x
         rules = [
             FOL_Rule1(nclasses, Rule_input, rule1_full),
         ]
@@ -225,20 +253,20 @@ with tf.Graph().as_default():
             os.makedirs(checkpoint_dir)
         saver = tf.train.Saver(tf.global_variables(), max_to_keep=FLAGS.num_checkpoints)
 
-        # Write vocabulary
-        vocab_processor.save(os.path.join(out_dir, "vocab"))
-
+        # # Write vocabulary
+        # vocab_processor.save(os.path.join(out_dir, "vocab"))
+        #
         # Initialize all variables
         sess.run(tf.global_variables_initializer())
 
-        #  Use pre-trained word2vec as initializer
-        if FLAGS.word2vec:
-            with tf.device('/cpu:0'):
-                embedding_placeholder = tf.placeholder(
-                    tf.float32, [len(vocab_processor.vocabulary_), FLAGS.embedding_dim])
-            embedding_init = cnn.W.assign(embedding_placeholder)
-            sess.run(embedding_init, feed_dict={embedding_placeholder: embed})
-        del embed
+        # #  Use pre-trained word2vec as initializer
+        # if FLAGS.word2vec:
+        #     with tf.device('/cpu:0'):
+        #         embedding_placeholder = tf.placeholder(
+        #             tf.float32, [len(vocab_processor.vocabulary_), FLAGS.embedding_dim])
+        #     embedding_init = cnn.W.assign(embedding_placeholder)
+        #     sess.run(embedding_init, feed_dict={embedding_placeholder: embed})
+        # del embed
 
         def train_step(x_batch, y_batch, x_fea_batch):
             """
@@ -315,16 +343,19 @@ with tf.Graph().as_default():
                 """ linear decay : pi_t = 1 - t / num_of_steps"""
                 num_batches_per_epoch = int((data_len - 1) / FLAGS.batch_size) + 1
                 pi = max(1 - cur_iter / (num_batches_per_epoch * FLAGS.num_epochs), lb)
+            elif curve == 'constant':
+                """ constant pi """
+                pi = k
             return pi
 
         # Batches Generator
         batches = data_helpers.batch_fea_iter(
-            list(zip(x_train, y_train)), x_fea_train, FLAGS.batch_size, FLAGS.num_epochs)
+            x_train, y_train, x_fea_train, FLAGS.batch_size, FLAGS.num_epochs)
 
         # Training loop. For each batch...
         for batch in batches:
-            batch, x_fea_batch = batch
-            x_batch, y_batch = zip(*batch)
+            x_batch, y_batch, x_fea_batch = batch
+            # x_batch, y_batch = zip(*batch)
             train_step(x_batch, y_batch, x_fea_batch)
             current_step = tf.train.global_step(sess, global_step)
             if current_step % FLAGS.evaluate_every == 0:

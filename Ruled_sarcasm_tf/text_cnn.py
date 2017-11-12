@@ -7,35 +7,37 @@ class TextCNN(object):
     A CNN for text classification.
     Uses an embedding layer, followed by a convolutional, max-pooling and softmax layer.
     """
-    def __init__(self, sequence_length, num_classes, vocab_size,
+    def __init__(self, sequence_length, num_classes,  # vocab_size,
                  embedding_size, filter_sizes, num_filters, l2_reg_lambda=0.0,
                  trained_w2v=None):
 
         # Placeholders for input, output and dropout
-        self.input_x = tf.placeholder(tf.int32, [None, sequence_length], name="input_x")
+        self.input_x = tf.placeholder(tf.float32, [None, sequence_length, embedding_size], name="input_x")
         self.input_y = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
         # Keeping track of l2 regularization loss (optional)
         l2_loss = tf.constant(0.0)
 
-        # Embedding layer
-        with tf.device('/cpu:0'), tf.variable_scope("embedding"):
-            if trained_w2v is None:
-                self.W = tf.get_variable(
-                    "W",
-                    initializer=tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),
-                    trainable=False)
-            else:
-                # self.W = tf.get_variable(
-                #     "W",
-                #     shape=trained_w2v.shape,
-                #     initializer=tf.constant_initializer(trained_w2v),
-                #     trainable=False)
-                self.W = tf.constant(trained_w2v, dtype=tf.float32)
-            self.embedded_chars = tf.nn.embedding_lookup(self.W, self.input_x)
-            self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1)
-            # size:  [None, sequence_length, embedding_size, 1]
+        # # Embedding layer
+        # with tf.device('/cpu:0'), tf.variable_scope("embedding"):
+        #     if trained_w2v is None:
+        #         self.W = tf.get_variable(
+        #             "W",
+        #             initializer=tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),
+        #             trainable=False)
+        #     else:
+        #         # self.W = tf.get_variable(
+        #         #     "W",
+        #         #     shape=trained_w2v.shape,
+        #         #     initializer=tf.constant_initializer(trained_w2v),
+        #         #     trainable=False)
+        #         self.W = tf.constant(trained_w2v, dtype=tf.float32)
+        #     self.embedded_chars = tf.nn.embedding_lookup(self.W, self.input_x)
+        #     self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1)
+        #     # size:  [None, sequence_length, embedding_size, 1]
+
+        self.embedded_chars_expanded = tf.expand_dims(self.input_x, -1)
 
         # Create a convolution + maxpool layer for each filter size
         pooled_outputs = []

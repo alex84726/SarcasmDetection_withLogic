@@ -76,43 +76,47 @@ def load_npy_data(data_file):
     return X, y
 
 
-def batch_iter(data, batch_size, num_epochs, shuffle=True):
+def batch_iter(x, y, batch_size, num_epochs, shuffle=True):
     """
     Generates a batch iterator for a dataset.
     """
-    data = np.array(data)
-    data_size = len(data)
-    num_batches_per_epoch = int((len(data) - 1) / batch_size) + 1
+    # data = np.array(data)
+    data_size = x.shape[0]
+    num_batches_per_epoch = int((data_size - 1) / batch_size) + 1
     for epoch in range(num_epochs):
         # Shuffle the data at each epoch
         if shuffle:
             shuffle_indices = np.random.permutation(np.arange(data_size))
-            shuffled_data = data[shuffle_indices]
+            shuffled_x = x[shuffle_indices]
+            shuffled_y = y[shuffle_indices]
         else:
-            shuffled_data = data
+            shuffled_x = x
+            shuffled_y = y
         for batch_num in range(num_batches_per_epoch):
             start_index = batch_num * batch_size
             end_index = min((batch_num + 1) * batch_size, data_size)
-            yield shuffled_data[start_index:end_index]
+            yield (shuffled_x[start_index:end_index], shuffled_y[start_index:end_index])
 
 
-def batch_fea_iter(data, fea, batch_size, num_epochs, shuffle=True):
+def batch_fea_iter(x, y, fea, batch_size, num_epochs, shuffle=True):
     """
     Generates a batch iterator for a dataset.
     """
-    data = np.array(data)
-    data_size = len(data)
-    num_batches_per_epoch = int((len(data) - 1) / batch_size) + 1
+    # data = np.array(data)
+    data_size = x.shape[0]
+    num_batches_per_epoch = int((data_size - 1) / batch_size) + 1
     for epoch in range(num_epochs):
         # Shuffle the data at each epoch
         if shuffle:
             shuffle_indices = np.random.permutation(np.arange(data_size))
-            shuffled_data = data[shuffle_indices]
+            shuffled_x = x[shuffle_indices]
+            shuffled_y = y[shuffle_indices]
             shuffled_fea = {}
             for k, v in fea.items():
                 shuffled_fea[k] = np.array(v)[shuffle_indices]
         else:
-            shuffled_data = data
+            shuffled_x = x
+            shuffled_y = y
             shuffled_fea = fea
         for batch_num in range(num_batches_per_epoch):
             start_index = batch_num * batch_size
@@ -120,4 +124,6 @@ def batch_fea_iter(data, fea, batch_size, num_epochs, shuffle=True):
             return_fea = {}
             for k, v in shuffled_fea.items():
                 return_fea[k] = v[start_index:end_index]
-            yield (shuffled_data[start_index:end_index], return_fea)
+            yield (shuffled_x[start_index:end_index],
+                   shuffled_y[start_index:end_index],
+                   return_fea)
