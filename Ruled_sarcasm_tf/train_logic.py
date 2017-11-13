@@ -71,7 +71,7 @@ max_document_length = max([len(x.split(' ')) for x in x_text])
 
 if FLAGS.train_word2vec:
     vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
-    x_w2v = np.asarray(list(vocab_processor.fit_transform(x_text)))
+    x_w2v = np.array(list(vocab_processor.fit_transform(x_text)))
 else:
     print("Direct use word embeddings ...")
     print("Loading word embeddings ...")
@@ -82,7 +82,7 @@ else:
     vocabs = set()
     print("Transform raw text to word_vectors")
     UNK_embed = np.zeros(w2v.vector_size)
-    vocabs.add('_UNK_')
+    vocabs.add('<UNK>')
     x_w2v = [s.split() for s in x_text]
     for i, s in enumerate(x_w2v):
         for j, w in enumerate(s):
@@ -95,7 +95,7 @@ else:
         if len(s) < max_document_length:
             s = [UNK_embed] * (max_document_length - len(s)) + s
             #s = s + [UNK_embed] * (max_document_length - len(s))
-    x_w2v[i] = s
+    x_w2v[i] = np.asarray(s)
     x_w2v = np.asarray(x_w2v)
 
 # Split train/dev set
@@ -130,7 +130,7 @@ with tf.Graph().as_default():
             num_filters=FLAGS.num_filters,
             vocab_size=len(vocab_processor.vocabulary_) if FLAGS.train_word2vec else len(vocabs),
             l2_reg_lambda=FLAGS.l2_reg_lambda,
-            trained_w2v=FLAGS.train_word2vec
+            train_w2v=FLAGS.train_word2vec
         )
 
         # build the feature of RULE1-rule
@@ -225,13 +225,13 @@ with tf.Graph().as_default():
             print("Loading word embeddings ...")
             w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
             w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
-            embedding_vectors = np.random.rand(-0.5, 0.5, (len(vocab_processor.vocabulary_), w2v.vector_size))
+            embedding_vectors = np.random.uniform(-0.5, 0.5, (len(vocab_processor.vocabulary_), w2v.vector_size))
             for word_, idx_ in vocab_processor.vocabulary_._mapping.items():
                 try:
                     embedding_vectors[idx_] = w2v[word_]
                 except KeyError as err:
                     pass
-            sess.run(cnn.W.assign(embedding_vectors)
+            sess.run(cnn.W.assign(embedding_vectors))
 
         def train_step(x_batch, y_batch, x_fea_batch):
             """

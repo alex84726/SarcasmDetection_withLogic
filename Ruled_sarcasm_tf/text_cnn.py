@@ -8,7 +8,7 @@ class TextCNN(object):
     Uses an embedding layer, followed by a convolutional, max-pooling and softmax layer.
     """
     def __init__(self, sequence_length, num_classes, embedding_size, filter_sizes, 
-                 num_filters, vocab_size, l2_reg_lambda=0.0, trained_w2v=False):
+                 num_filters, vocab_size, l2_reg_lambda=0.0, train_w2v=False):
         
         # Placeholders for input, output and dropout
         self.input_y = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
@@ -17,7 +17,7 @@ class TextCNN(object):
         l2_loss = tf.constant(0.0)
         
         if train_w2v:
-            self.input_x = tf.placeholder(tf.int32, [None, sequence_lenght], name="input_x")
+            self.input_x = tf.placeholder(tf.int32, [None, sequence_length], name="input_x")
             # Embedding layer
             with tf.device('/cpu'), tf.variable_scope("embedding"):
                 self.W = tf.get_variable(

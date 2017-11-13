@@ -10,4 +10,5 @@ python3 train_logic.py  --num_epochs 20 \
                   --gpu_usage 1.0 \
                   --checkpoint_every 200\
                   --pi_curve exp_arise \
-                  --pi_params 0.7,1e-5
+                  --pi_params 0.7,1e-5 \
+                  --train_word2vec True
