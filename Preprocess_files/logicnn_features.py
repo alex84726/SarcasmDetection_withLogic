@@ -187,7 +187,7 @@ def extract_rule_ibm(revs, tone_analyzer):
         else:
             rule1_ind.append(0)
             rule1_fea.append('')
-            rule1_senti.append(0.5)
+            rule1_senti.append(0)
     print('Number of #rule1: %d' % rule1_fea_cnt)
     return {
         'rule1_text': rule1_fea,
@@ -197,5 +197,5 @@ def extract_rule_ibm(revs, tone_analyzer):
 
 
 if __name__ == "__main__":
-    # main()
-    ibm()
+    main()
+    # ibm()
