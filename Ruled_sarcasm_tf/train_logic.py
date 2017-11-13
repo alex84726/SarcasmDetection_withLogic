@@ -36,6 +36,7 @@ tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 0.0)")
 tf.flags.DEFINE_boolean("word2vec", False, "Using pre-trained word2vec as initializer (default: False)")
+tf.flags.DEFINE_boolean("train_word2vec", False, "Whether to train word2vec (default: False)")
 tf.flags.DEFINE_string("pi_params", "0.95,0", "parameters of pi: 'base of decay func, lower bound' (default: '0.95,0 ')")
 tf.flags.DEFINE_string("pi_curve", "exp_arise", "type of pi change curve: exp_arise, exp_decay,linear_arise, linear_decay (default: exp_arise)")
 
@@ -66,77 +67,36 @@ FLAGS.pi_params = list(map(float, FLAGS.pi_params.split(",")))
 print("Loading data...")
 x_text, y = data_helpers.load_npy_data(FLAGS.data_file)
 x_fea = np.load(FLAGS.fea_file).item()
-
-print("Loading word embeddings ...")
-w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
-w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
-
-# Build vocabulary
 max_document_length = max([len(x.split(' ')) for x in x_text])
-vocabs = set()
 
-print("Transform raw text to word_vectors")
-UNK_embed = np.zeros(w2v.vector_size)
-x_w2v = [s.split() for s in x_text]
-for i, s in enumerate(x_w2v):
-    orign_len = len(s)
-    for j, w in enumerate(s):
-        try:
-            s[j] = w2v[w]
-            vocabs.add(w)
-        except KeyError as err:
-            # print(err)
-            s[j] = UNK_embed
-    if len(s) < max_document_length:
-        s = s + [UNK_embed] * (max_document_length - len(s))
-    x_w2v[i] = s
-x_w2v = np.asarray(x_w2v)
-
-'''
-def _identity(iterator):
-    # iterator: Input iterator with strings.
-    for value in iterator:
-        yield value.split()
-
-
-vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn=_identity)
-
-if FLAGS.word2vec:
-    #  Load Google word2vector
+if FLAGS.train_word2vec:
+    vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
+    x_w2v = np.asarray(list(vocab_processor.fit_transform(x_text)))
+else:
+    print("Direct use word embeddings ...")
     print("Loading word embeddings ...")
     w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
-    pre_w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+    w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
 
-    vocab = list(pre_w2v.vocab.keys())
-    vocab_processor.fit(vocab)  # intial by Google word2vector
-    vocab_processor.vocabulary_.freeze(freeze=False)  # Allow adding new words from Training data
-    pre_vocab = list(vocab_processor.vocabulary_._mapping.keys()).copy()
-
-x = np.array(list(vocab_processor.fit_transform(x_text)))
-
-if FLAGS.word2vec:
-    print("Create w2v numpy vector")
-    embed = [np.zeros([FLAGS.embedding_dim])]  # embedding for '<UNK>' at index 0
-    for vocab_single in pre_vocab:
-        if vocab_single != vocab_processor.vocabulary_._unknown_token:
-            embed.append(pre_w2v.wv[vocab_single])
-    embed = np.asarray(embed)
-    num_new_word = len(vocab_processor.vocabulary_) - len(pre_vocab)
-    # embedding for new words
-    embed = np.concatenate((embed, np.random.randn(num_new_word, FLAGS.embedding_dim)), axis=0)
-    del pre_w2v
-    del vocab
-    del pre_vocab
-
-# Randomly shuffle data
-# np.random.seed(10)
-# shuffle_indices = np.random.permutation(np.arange(len(y)))
-# x_shuffled = x[shuffle_indices]
-# y_shuffled = y[shuffle_indices]
-
-x_shuffled = x
-y_shuffled = y
-'''
+    # Build vocabulary
+    vocabs = set()
+    print("Transform raw text to word_vectors")
+    UNK_embed = np.zeros(w2v.vector_size)
+    vocabs.add('_UNK_')
+    x_w2v = [s.split() for s in x_text]
+    for i, s in enumerate(x_w2v):
+        for j, w in enumerate(s):
+            try:
+                s[j] = w2v[w]
+                vocabs.add(w)
+            except KeyError as err:
+                s[j] = UNK_embed
+            
+        if len(s) < max_document_length:
+            s = [UNK_embed] * (max_document_length - len(s)) + s
+            #s = s + [UNK_embed] * (max_document_length - len(s))
+    x_w2v[i] = s
+    x_w2v = np.asarray(x_w2v)
 
 # Split train/dev set
 # TODO: This is very crude, should use cross-validation
@@ -149,14 +109,12 @@ x_fea_dev = {}
 for k, v in x_fea.items():
     x_fea_train[k] = v[:dev_sample_index]
     x_fea_dev[k] = v[dev_sample_index:]
-print("Vocabulary Size: {:d}".format(len(vocabs) + 1))  # plus one vecause of unknown
-# print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
+print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_) if FLAGS.train_word2vec else len(vocabs) ))
 print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
 
 
 # Training
 # ==================================================
-
 with tf.Graph().as_default():
     session_conf = tf.ConfigProto(
         gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_usage),
@@ -167,11 +125,13 @@ with tf.Graph().as_default():
         cnn = TextCNN(
             sequence_length=x_train.shape[1],
             num_classes=y_train.shape[1],
-            # vocab_size=len(vocab_processor.vocabulary_),
             embedding_size=FLAGS.embedding_dim,
             filter_sizes=list(map(int, FLAGS.filter_sizes.split(","))),
             num_filters=FLAGS.num_filters,
-            l2_reg_lambda=FLAGS.l2_reg_lambda)
+            vocab_size=len(vocab_processor.vocabulary_) if FLAGS.train_word2vec else len(vocabs),
+            l2_reg_lambda=FLAGS.l2_reg_lambda,
+            trained_w2v=FLAGS.train_word2vec
+        )
 
         # build the feature of RULE1-rule
         # fea: symbolic feature tensor, of shape 3
@@ -260,14 +220,18 @@ with tf.Graph().as_default():
         # Initialize all variables
         sess.run(tf.global_variables_initializer())
 
-        # #  Use pre-trained word2vec as initializer
-        # if FLAGS.word2vec:
-        #     with tf.device('/cpu:0'):
-        #         embedding_placeholder = tf.placeholder(
-        #             tf.float32, [len(vocab_processor.vocabulary_), FLAGS.embedding_dim])
-        #     embedding_init = cnn.W.assign(embedding_placeholder)
-        #     sess.run(embedding_init, feed_dict={embedding_placeholder: embed})
-        # del embed
+        #  Use pre-trained word2vec as initializer
+        if FLAGS.train_word2vec:
+            print("Loading word embeddings ...")
+            w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
+            w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+            embedding_vectors = np.random.rand(-0.5, 0.5, (len(vocab_processor.vocabulary_), w2v.vector_size))
+            for word_, idx_ in vocab_processor.vocabulary_._mapping.items():
+                try:
+                    embedding_vectors[idx_] = w2v[word_]
+                except KeyError as err:
+                    pass
+            sess.run(cnn.W.assign(embedding_vectors)
 
         def train_step(x_batch, y_batch, x_fea_batch):
             """
