@@ -92,50 +92,51 @@ for i, s in enumerate(x_w2v):
     x_w2v[i] = s
 x_w2v = np.asarray(x_w2v)
 
+'''
+def _identity(iterator):
+    # iterator: Input iterator with strings.
+    for value in iterator:
+        yield value.split()
 
-# def _identity(iterator):
-#     # iterator: Input iterator with strings.
-#     for value in iterator:
-#         yield value.split()
-#
-#
-# vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn=_identity)
-#
-# if FLAGS.word2vec:
-#     #  Load Google word2vector
-#     print("Loading word embeddings ...")
-#     w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
-#     pre_w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
-#
-#     vocab = list(pre_w2v.vocab.keys())
-#     vocab_processor.fit(vocab)  # intial by Google word2vector
-#     vocab_processor.vocabulary_.freeze(freeze=False)  # Allow adding new words from Training data
-#     pre_vocab = list(vocab_processor.vocabulary_._mapping.keys()).copy()
-#
-# x = np.array(list(vocab_processor.fit_transform(x_text)))
-#
-# if FLAGS.word2vec:
-#     print("Create w2v numpy vector")
-#     embed = [np.zeros([FLAGS.embedding_dim])]  # embedding for '<UNK>' at index 0
-#     for vocab_single in pre_vocab:
-#         if vocab_single != vocab_processor.vocabulary_._unknown_token:
-#             embed.append(pre_w2v.wv[vocab_single])
-#     embed = np.asarray(embed)
-#     num_new_word = len(vocab_processor.vocabulary_) - len(pre_vocab)
-#     # embedding for new words
-#     embed = np.concatenate((embed, np.random.randn(num_new_word, FLAGS.embedding_dim)), axis=0)
-#     del pre_w2v
-#     del vocab
-#     del pre_vocab
-#
-# # Randomly shuffle data
-# # np.random.seed(10)
-# # shuffle_indices = np.random.permutation(np.arange(len(y)))
-# # x_shuffled = x[shuffle_indices]
-# # y_shuffled = y[shuffle_indices]
-#
-# x_shuffled = x
-# y_shuffled = y
+
+vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn=_identity)
+
+if FLAGS.word2vec:
+    #  Load Google word2vector
+    print("Loading word embeddings ...")
+    w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
+    pre_w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+
+    vocab = list(pre_w2v.vocab.keys())
+    vocab_processor.fit(vocab)  # intial by Google word2vector
+    vocab_processor.vocabulary_.freeze(freeze=False)  # Allow adding new words from Training data
+    pre_vocab = list(vocab_processor.vocabulary_._mapping.keys()).copy()
+
+x = np.array(list(vocab_processor.fit_transform(x_text)))
+
+if FLAGS.word2vec:
+    print("Create w2v numpy vector")
+    embed = [np.zeros([FLAGS.embedding_dim])]  # embedding for '<UNK>' at index 0
+    for vocab_single in pre_vocab:
+        if vocab_single != vocab_processor.vocabulary_._unknown_token:
+            embed.append(pre_w2v.wv[vocab_single])
+    embed = np.asarray(embed)
+    num_new_word = len(vocab_processor.vocabulary_) - len(pre_vocab)
+    # embedding for new words
+    embed = np.concatenate((embed, np.random.randn(num_new_word, FLAGS.embedding_dim)), axis=0)
+    del pre_w2v
+    del vocab
+    del pre_vocab
+
+# Randomly shuffle data
+# np.random.seed(10)
+# shuffle_indices = np.random.permutation(np.arange(len(y)))
+# x_shuffled = x[shuffle_indices]
+# y_shuffled = y[shuffle_indices]
+
+x_shuffled = x
+y_shuffled = y
+'''
 
 # Split train/dev set
 # TODO: This is very crude, should use cross-validation

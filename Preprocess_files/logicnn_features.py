@@ -106,7 +106,7 @@ def extract_rule1(revs):
         else:
             rule1_ind.append(0)
             rule1_fea.append('')
-            rule1_senti.append(0.5)
+            rule1_senti.append(0)
     print('Number of #rule1: %d' % rule1_fea_cnt)
     return {
         'rule1_text': rule1_fea,

@@ -1,25 +1,23 @@
-# from __future__ import print_function, division, absolute_import
-
 import cPickle
 import os
 import re
 import sys
 import time
+import math
 import warnings
 from collections import OrderedDict, defaultdict
 
 import numpy as np
-
 import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
+import pandas as pd
 
 warnings.filterwarnings("ignore")
 
 
 def Iden(x):  # identity map
     return x
-
 
 def train_conv_net(datasets,
                    U,
@@ -505,7 +503,6 @@ def make_idx_data(revs, fea, word_idx_map, max_l=51, k=300, filter_h=5):
     train_text, dev_text, test_text = [], [], []
     train_fea, dev_fea, test_fea = {}, {}, {}
     fea['rule1'] = []
-    # fea['rule1_sent'] = []
     for k in fea.keys():
         train_fea[k], dev_fea[k], test_fea[k] = [], [], []
     for i, rev in enumerate(revs):
@@ -596,12 +593,14 @@ if __name__ == "__main__":
     path = 'data/'
     print path
     print "loading data...",
-    x = cPickle.load(open("%s/stsa.binary.p" % path, "rb"))
+    #x = cPickle.load(open("%s/stsa.binary.p" % path, "rb"))
+    x = cPickle.load(open("%s/stsa.sarcasm.p" % path, "rb"))
     revs, W, W2, word_idx_map, vocab = x[0], x[1], x[2], x[3], x[4]
 
     print "data loaded!"
     print "loading features..."
-    fea = cPickle.load(open("%s/stsa.binary.p.fea.p" % path, "rb"))
+    #fea = cPickle.load(open("%s/stsa.binary.p.fea.p" % path, "rb"))
+    fea = cPickle.load(open("%s/stsa.sarcasm.p.fea.p" % path, "rb"))
     print "features loaded!"
 
     mode = sys.argv[1]
@@ -625,12 +624,12 @@ if __name__ == "__main__":
        This function is similar to the exec statement, but parses a file instead of a string.
     exec:
        This statement supports dynamic execution of Python code.
-
     """
     # q: teacher network; p: student network
     q_results = []
     p_results = []
-    datasets = make_idx_data(revs, fea, word_idx_map, max_l=53, k=300, filter_h=5)
+    max_l = np.max(pd.DataFrame(revs)["num_words"])
+    datasets = make_idx_data(revs, fea, word_idx_map, max_l=max_l, k=300, filter_h=5)
 
     perf = train_conv_net(datasets,
                           U,
@@ -641,7 +640,7 @@ if __name__ == "__main__":
                           conv_non_linear="relu",
                           hidden_units=[100, 2],
                           shuffle_batch=True,
-                          n_epochs=1,
+                          n_epochs=20,
                           sqr_norm_lim=9,
                           non_static=non_static,
                           batch_size=50,
