@@ -95,7 +95,7 @@ else:
         if len(s) < max_document_length:
             s = [UNK_embed] * (max_document_length - len(s)) + s
             #s = s + [UNK_embed] * (max_document_length - len(s))
-    x_w2v[i] = np.asarray(s)
+        x_w2v[i] = np.asarray(s)
     x_w2v = np.asarray(x_w2v)
 
 # Split train/dev set

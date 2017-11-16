@@ -45,17 +45,19 @@ class TextCNN(object):
                     padding="VALID",
                     name="conv")  # size: [None, 49-3+1, 1,128]
                 # Apply batch_normalization
-                conv_bn = tf.contrib.layers.batch_norm(conv, center=True, scale=False, scope='BN')
+                #conv_bn = tf.contrib.layers.batch_norm(conv, center=True, scale=False, scope='BN')
                 # Apply nonlinearity
-                h = tf.nn.relu(tf.nn.bias_add(conv_bn, b), name="relu")
+                #h = tf.nn.relu(tf.nn.bias_add(conv_bn, b), name="relu")
+                h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
                 # Maxpooling over the outputs
                 pooled = tf.nn.max_pool(
                     h,
                     ksize=[1, filter_size, 1, 1],
+                    #ksize=[1, sequence_length - filter_size + 1 , 1, 1],
                     strides=[1, 1, 1, 1],
                     padding='VALID',
                     name="pool")
-                # pooled_outputs.append(pooled)
+                #pooled_outputs.append(pooled)
             with tf.variable_scope("conv2-maxpool-%s" % filter_size):
                 # Convolution Layer
                 filter_shape = [filter_size, 1, num_filters, num_filters]
@@ -68,9 +70,10 @@ class TextCNN(object):
                     padding="VALID",
                     name="conv")
                 # Apply batch_normalization
-                conv_bn = tf.contrib.layers.batch_norm(conv2, center=True, scale=False, scope='BN')
+                #conv_bn = tf.contrib.layers.batch_norm(conv2, center=True, scale=False, scope='BN')
                 # Apply nonlinearity
-                h = tf.nn.relu(tf.nn.bias_add(conv_bn, b), name="relu")  # size: [None, 43, 1, 128]
+                #h = tf.nn.relu(tf.nn.bias_add(conv_bn, b), name="relu")  # size: [None, 43, 1, 128]
+                h = tf.nn.relu(tf.nn.bias_add(conv2, b), name="relu")  # size: [None, 43, 1, 128]
                 # Maxpooling over the outputs
                 pooled = tf.nn.max_pool(  # size: [None, 43, 1, 128]
                     h,
@@ -79,7 +82,7 @@ class TextCNN(object):
                     padding='VALID',
                     name="pool")
                 pooled_outputs.append(pooled)
-
+            
         # Combine all the pooled features
         num_filters_total = num_filters * len(filter_sizes)
         self.h_pool = tf.concat(pooled_outputs, 3)
