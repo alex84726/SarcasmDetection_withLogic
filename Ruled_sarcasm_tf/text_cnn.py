@@ -7,15 +7,15 @@ class TextCNN(object):
     A CNN for text classification.
     Uses an embedding layer, followed by a convolutional, max-pooling and softmax layer.
     """
-    def __init__(self, sequence_length, num_classes, embedding_size, filter_sizes, 
+    def __init__(self, sequence_length, num_classes, embedding_size, filter_sizes,
                  num_filters, vocab_size, l2_reg_lambda=0.0, train_w2v=False):
-        
+
         # Placeholders for input, output and dropout
         self.input_y = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         # Keeping track of l2 regularization loss (optional)
         l2_loss = tf.constant(0.0)
-        
+
         if train_w2v:
             self.input_x = tf.placeholder(tf.int32, [None, sequence_length], name="input_x")
             # Embedding layer
@@ -82,7 +82,7 @@ class TextCNN(object):
                     padding='VALID',
                     name="pool")
                 pooled_outputs.append(pooled)
-            
+
         # Combine all the pooled features
         num_filters_total = num_filters * len(filter_sizes)
         self.h_pool = tf.concat(pooled_outputs, 3)
@@ -109,11 +109,11 @@ class TextCNN(object):
         # CalculateMean cross-entropy loss
         with tf.name_scope("loss"):
             losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y)
-            self.loss = tf.reduce_mean(losses) + l2_reg_lambda * l2_loss
+            self.loss = tf.add(tf.reduce_mean(losses), l2_reg_lambda * l2_lossm, name="loss")
 
         with tf.name_scope("drop_loss"):
             losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.h_drop, labels=self.input_y)
-            self.drop_loss = tf.reduce_mean(losses) + l2_reg_lambda * l2_loss
+            self.drop_loss = tf.add(tf.reduce_mean(losses), l2_reg_lambda * l2_loss, name="drop_loss")
 
         # Accuracy
         with tf.name_scope("accuracy"):
