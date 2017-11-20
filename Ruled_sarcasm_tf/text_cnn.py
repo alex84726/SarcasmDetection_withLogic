@@ -109,7 +109,7 @@ class TextCNN(object):
         # CalculateMean cross-entropy loss
         with tf.name_scope("loss"):
             losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y)
-            self.loss = tf.add(tf.reduce_mean(losses), l2_reg_lambda * l2_lossm, name="loss")
+            self.loss = tf.add(tf.reduce_mean(losses), l2_reg_lambda * l2_loss, name="loss")
 
         with tf.name_scope("drop_loss"):
             losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.h_drop, labels=self.input_y)

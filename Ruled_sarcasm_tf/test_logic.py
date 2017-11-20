@@ -20,6 +20,7 @@ except:
 
 tf.flags.DEFINE_string("data_file", "../Data/test_balanced.npy", "Data source for the testing data.")
 # tf.flags.DEFINE_string("fea_file", "../Data/train_balanced.fea.npy", "Data source for the training feature data.")
+tf.flags.DEFINE_boolean("train_word2vec", False, "Whether training use train word2vec (default: False)")
 tf.flags.DEFINE_string("model_ckpt", " ", "path to checkpoit of trained model")
 tf.flags.DEFINE_float("gpu_usage", 0.2, "per process gpu memory fraction, (defult: 1.0)")
 FLAGS = tf.flags.FLAGS
@@ -30,30 +31,35 @@ print("Loading data...")
 x_text, y = data_helpers.load_npy_data(FLAGS.data_file)
 max_document_length = 49
 
-print("Direct use word embeddings ...")
-print("Loading word embeddings ...")
-w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
-w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+if not FLAGS.train_word2vec:
+    print("Direct use word embeddings ...")
+    print("Loading word embeddings ...")
+    w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
+    w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
 
-# Build vocabulary
-vocabs = set()
-print("Transform raw text to word_vectors")
-UNK_embed = np.zeros(w2v.vector_size)
-vocabs.add('<UNK>')
-x_w2v = [s.split() for s in x_text]
-for i, s in enumerate(x_w2v):
-    for j, w in enumerate(s):
-        try:
-            s[j] = w2v[w]
-            vocabs.add(w)
-        except KeyError as err:
-            s[j] = UNK_embed
+    # Build vocabulary
+    vocabs = set()
+    print("Transform raw text to word_vectors")
+    UNK_embed = np.zeros(w2v.vector_size)
+    vocabs.add('<UNK>')
+    x_w2v = [s.split() for s in x_text]
+    for i, s in enumerate(x_w2v):
+        for j, w in enumerate(s):
+            try:
+                s[j] = w2v[w]
+                vocabs.add(w)
+            except KeyError as err:
+                s[j] = UNK_embed
 
-    if len(s) < max_document_length:
-        s = [UNK_embed] * (max_document_length - len(s)) + s
-        # s = s + [UNK_embed] * (max_document_length - len(s))
-    x_w2v[i] = np.asarray(s)
-x_w2v = np.asarray(x_w2v)
+        if len(s) < max_document_length:
+            s = [UNK_embed] * (max_document_length - len(s)) + s
+            # s = s + [UNK_embed] * (max_document_length - len(s))
+        x_w2v[i] = np.asarray(s)
+    x_w2v = np.asarray(x_w2v)
+
+else:
+    vocab_processor = pickle.load(open('../Data/vocab_processor', 'rb'))
+    x_w2v = np.array(list(vocab_processor.fit_transform(x_text)))
 
 
 print("Loading trained model from {}".format(FLAGS.model_ckpt))
@@ -63,6 +69,7 @@ session_conf = tf.ConfigProto(
     device_count={"GPU": 0, "CPU": 4},
     allow_soft_placement=True,
     log_device_placement=False)
+
 with tf.Session(config=session_conf) as sess:
     saver = tf.train.import_meta_graph(FLAGS.model_ckpt + '.meta', clear_devices=True)
     saver.restore(sess, FLAGS.model_ckpt)

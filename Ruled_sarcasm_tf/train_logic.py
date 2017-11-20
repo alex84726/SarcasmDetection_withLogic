@@ -71,6 +71,7 @@ max_document_length = max([len(x.split(' ')) for x in x_text])
 
 if FLAGS.train_word2vec:
     vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
+    pickle.dump(vocab_processor, open('../Data/vocab_processor', 'wb'))
     x_w2v = np.array(list(vocab_processor.fit_transform(x_text)))
 else:
     print("Direct use word embeddings ...")
