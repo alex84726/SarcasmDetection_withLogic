@@ -11,4 +11,4 @@ python3 train_logic.py  --num_epochs 20 \
                   --checkpoint_every 200\
                   --pi_curve exp_decay \
                   --pi_params 0.93,1e-5 \
-                  --train_word2vec False
+                  --train_word2vec True

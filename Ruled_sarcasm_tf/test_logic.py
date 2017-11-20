@@ -29,7 +29,7 @@ FLAGS._parse_flags()
 # Load data
 print("Loading data...")
 x_text, y = data_helpers.load_npy_data(FLAGS.data_file)
-max_document_length = 49
+max_document_length = 46
 
 if not FLAGS.train_word2vec:
     print("Direct use word embeddings ...")
@@ -59,8 +59,8 @@ if not FLAGS.train_word2vec:
 
 else:
     vocab_processor = pickle.load(open('../Data/vocab_processor', 'rb'))
-    x_w2v = np.array(list(vocab_processor.fit_transform(x_text)))
-
+    vocab_processor.vocabulary_.freeze(True)
+    x_w2v = np.array(list(vocab_processor.transform(x_text)))
 
 print("Loading trained model from {}".format(FLAGS.model_ckpt))
 tf.reset_default_graph()
@@ -73,7 +73,6 @@ session_conf = tf.ConfigProto(
 with tf.Session(config=session_conf) as sess:
     saver = tf.train.import_meta_graph(FLAGS.model_ckpt + '.meta', clear_devices=True)
     saver.restore(sess, FLAGS.model_ckpt)
-    sess.run(tf.global_variables_initializer())
 
     Graph = tf.get_default_graph()
     input_x = Graph.get_tensor_by_name('input_x:0')

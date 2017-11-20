@@ -71,8 +71,8 @@ max_document_length = max([len(x.split(' ')) for x in x_text])
 
 if FLAGS.train_word2vec:
     vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
-    pickle.dump(vocab_processor, open('../Data/vocab_processor', 'wb'))
     x_w2v = np.array(list(vocab_processor.fit_transform(x_text)))
+    pickle.dump(vocab_processor, open('../Data/vocab_processor', 'wb'))
 else:
     print("Direct use word embeddings ...")
     print("Loading word embeddings ...")
@@ -164,7 +164,7 @@ with tf.Graph().as_default():
 
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
-        optimizer = tf.train.AdamOptimizer(1e-3)
+        optimizer = tf.train.AdamOptimizer(5e-3)
         grads_and_vars = optimizer.compute_gradients(logic_nn.neg_log_liklihood)
         train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
