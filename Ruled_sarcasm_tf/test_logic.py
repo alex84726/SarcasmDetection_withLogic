@@ -12,6 +12,7 @@ from tensorflow.contrib import learn
 
 import data_helpers
 from gensim.models.keyedvectors import KeyedVectors
+from sklearn.metrics import accuracy_score
 
 try:
     import cPicle as pickle
@@ -91,7 +92,34 @@ with tf.Session(config=session_conf) as sess:
         # rule1_ind: np.expand_dims(x_fea_batch["rule1_ind"], 1),
         # rule1_senti: np.expand_dims(x_fea_batch["rule1_senti"], 1),
     }
+    
+    love_collection = []
+    for s in x_text:
+        if ' love ' in s:
+            love_collection.append(1)
+        else:
+            love_collection.append(0) 
     print("Testing ...")
     pred, acc = sess.run([pred_T, acc_T], feed_dict)
     print(pred)
     print("accuracy = {}".format(acc))
+    
+    love = []
+    non_love = []
+    with open('_correct_predict', 'w') as f:
+        for idx, label_love in enumerate(love_collection):
+            if label_love == 1:
+                if int(y[idx][1])==pred[idx]:
+                    love.append(1)
+                    f.write(str(idx)+'\n')
+                else:
+                    love.append(0)
+            elif label_love == 0:
+                if int(y[idx][1])==pred[idx]:
+                    non_love.append(1)
+                else:
+                    non_love.append(0)
+    print('Love accuracy: ', accuracy_score(np.asarray(love), np.ones((len(love),))))
+    print('Love data: ', len(love))
+    print('Others accuracy: ', accuracy_score(np.asarray(non_love), np.ones((len(non_love),))))
+    print('Others data: ', len(non_love))
