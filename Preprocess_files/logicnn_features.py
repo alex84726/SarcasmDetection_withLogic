@@ -104,6 +104,19 @@ def extract_rule1(revs):
             #rule1_senti.append((senti_ori - senti_res) * 0.5 + 0.5)
             rule1_senti.append(int(res["sentences"][0]["sentimentValue"])/4.0 if res["sentences"] != [] else 0.5)
             print('Found \'love\'. Finish annotation.')
+        elif 'Love ' in text:
+            rule1_ind.append(1)
+            fea = text.split('Love ')[1:]
+            fea = ''.join(fea)
+            fea = fea.strip().replace('  ', ' ')
+            rule1_fea_cnt += 1
+            rule1_fea.append(fea)
+            res = nlp.annotate(
+                fea,
+                properties={'annotators': 'sentiment',
+                            'outputFormat': 'json'})
+            rule1_senti.append(int(res["sentences"][0]["sentimentValue"])/4.0 if res["sentences"] != [] else 0.5) 
+            print('Found \'Love\'. Finish annotation.')
         else:
             rule1_ind.append(0)
             rule1_fea.append('')
@@ -162,7 +175,7 @@ def extract_rule_ibm(revs, tone_analyzer):
     rule1_senti = []
     rule1_fea_cnt = 0
     for text in revs:
-        if ' love ' in text:
+        if 'love ' in text:
             rule1_ind.append(1)
             # make the text after 'love' as the featurjava -mx5g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPe
             fea = text.split('love')[1:]
