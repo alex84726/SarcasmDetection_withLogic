@@ -244,7 +244,7 @@ with tf.Graph().as_default():
                         params=FLAGS.pi_params,
                         curve=FLAGS.pi_curve,
                         data_len=x_train.shape[0],)
-
+            print("pi: ", pi)
             feed_dict = {
                 logic_nn.network.input_x: x_batch,
                 logic_nn.network.input_y: y_batch,

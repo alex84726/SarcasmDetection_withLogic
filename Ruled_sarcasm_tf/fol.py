@@ -128,7 +128,8 @@ class FOL_But(FOL):
 
 
 class FOL_Rule1(FOL):
-    """ x=x1_love_x2 => { ~y => pred(x2) AND pred(x2) => ~y } """
+    #""" x=x1_love_x2 => { ~y => pos(x2) AND pos(x2) => ~y } """
+    """ x=x1_love_x2 => { pos(x2) => ~y } """
 
     def __init__(self, K, input, fea):
         """ Initialize
@@ -147,35 +148,17 @@ class FOL_Rule1(FOL):
     Rule-specific functions
 
     """
-
     def condition_single(self, x, f):
         return tf.cast(tf.equal(f[0], 1), tf.float32)
 
     def value_single(self, x, y, f):
-        ret = tf.reduce_mean([
-            tf.minimum([1. - (1 - y) + f[2], 1.]),
-            tf.minimum([1. - f[2] + (1 - y), 1.])
-        ])
+        #ret = tf.reduce_mean([
+        #    tf.minimum([1. - (1 - y) + f[2], 1.]),
+        #    tf.minimum([1. - f[2] + (1 - y), 1.])
+        #])
+        ret = tf.minimum([1. - f[2] + (1 - y), 1.])
         ret = tf.cast(ret, tf.float32)
         return tf.cast(
             tf.select(tf.equal(self.condition_single(x, f), 1.), ret, 1.),
             dtype=tf.float32
         )
-    # ---------------------------------------------------------------------------------
-    """
-    Efficient version specific to the BUT-rule
-    """
-
-    def log_distribution(self, w, X=None, F=None):
-        if F is None:
-            X, F = self.input, self.fea
-        F_mask = F[:, 0]
-        F_fea = F[:, 1:]
-        # y = 0
-        distr_y0 = w * tf.cast(F_mask, tf.float32) * tf.cast(F_fea[:, 0], tf.float32)
-        # y = 1
-        distr_y1 = w * tf.cast(F_mask, tf.float32) * tf.cast(F_fea[:, 1], tf.float32)
-        distr_y0 = tf.expand_dims(distr_y0, -1)
-        distr_y1 = tf.expand_dims(distr_y1, -1)
-        distr = tf.concat([distr_y0, distr_y1], axis=1)
-        return distr

@@ -14,6 +14,7 @@ class LogicNN(object):
         self.rule_lambda = tf.constant(rule_lambda, dtype=tf.float32, name='rule_lambda')
         self.ones = tf.ones([len(rules)], name='ones', dtype=tf.float32)
         self.pi = tf.placeholder(tf.float32, [], name="pi")
+        # TODO: duplicate announce  
         # pi: how percentage listen to teacher loss, starts from lower bound
         self.C = C
 
@@ -68,7 +69,7 @@ class LogicNN(object):
         for i, rule in enumerate(self.rules):
             distr = rule.log_distribution(self.C * self.rule_lambda[i], rule.input, rule.fea)
             distr_all += distr
-        distr_all += distr
+        #distr_all += distr
         #
         distr_y0 = distr_all[:, 0]
         distr_y0 = tf.expand_dims(distr_y0, -1)

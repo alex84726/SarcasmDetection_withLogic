@@ -99,29 +99,22 @@ def extract_rule1(revs):
                 text,
                 properties={'annotators': 'sentiment',
                             'outputFormat': 'json'})
-            senti_res = (int(res["sentences"][0]["sentimentValue"]) - 2) / 2.0 if res["sentences"] != [] else 0
-            senti_ori = (int(ori["sentences"][0]["sentimentValue"]) - 2) / 2.0 if ori["sentences"] != [] else 0
-            if senti_res > 1 or senti_ori > 1:
-                print('caution!!!!111')
-            if senti_res < -1 or senti_ori < -1:
-                print('caution!!!!-1-1-1')
-                print('fea', fea)
-                print('score', senti_res)
-                print('fea', text)
-                print('score', senti_ori)
-
-            rule1_senti.append((senti_ori - senti_res) * 0.25 + 0.5)
+            #senti_res = (int(res["sentences"][0]["sentimentValue"]) - 1) / 2.0 if res["sentences"] != [] else 0.5
+            #senti_ori = (int(ori["sentences"][0]["sentimentValue"]) - 1) / 2.0 if ori["sentences"] != [] else 0.5
+            #rule1_senti.append((senti_ori - senti_res) * 0.5 + 0.5)
+            rule1_senti.append(int(res["sentences"][0]["sentimentValue"])/4.0 if res["sentences"] != [] else 0.5)
             print('Found \'love\'. Finish annotation.')
         else:
             rule1_ind.append(0)
             rule1_fea.append('')
-            rule1_senti.append(0)
+            rule1_senti.append(0.5)
     print('Number of #rule1: %d' % rule1_fea_cnt)
     return {
         'rule1_text': rule1_fea,
         'rule1_ind': rule1_ind,
         'rule1_senti': rule1_senti,
     }
+
 
 
 def clean_str(string):
