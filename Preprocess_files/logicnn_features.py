@@ -99,9 +99,18 @@ def extract_rule1(revs):
                 text,
                 properties={'annotators': 'sentiment',
                             'outputFormat': 'json'})
-            senti_res = (int(res["sentences"][0]["sentimentValue"]) - 1) / 2.0 if res["sentences"] != [] else 0.5
-            senti_ori = (int(ori["sentences"][0]["sentimentValue"]) - 1) / 2.0 if ori["sentences"] != [] else 0.5
-            rule1_senti.append((senti_ori - senti_res) * 0.5 + 0.5)
+            senti_res = (int(res["sentences"][0]["sentimentValue"]) - 2) / 2.0 if res["sentences"] != [] else 0
+            senti_ori = (int(ori["sentences"][0]["sentimentValue"]) - 2) / 2.0 if ori["sentences"] != [] else 0
+            if senti_res > 1 or senti_ori > 1:
+                print('caution!!!!111')
+            if senti_res < -1 or senti_ori < -1:
+                print('caution!!!!-1-1-1')
+                print('fea', fea)
+                print('score', senti_res)
+                print('fea', text)
+                print('score', senti_ori)
+
+            rule1_senti.append((senti_ori - senti_res) * 0.25 + 0.5)
             print('Found \'love\'. Finish annotation.')
         else:
             rule1_ind.append(0)
@@ -171,7 +180,7 @@ def extract_rule_ibm(revs, tone_analyzer):
 
             res = tone_analyzer.tone(text=fea, sentences=True, content_type='text/plain')
             ori = tone_analyzer.tone(text=text, sentences=True, content_type='text/plain')
-            defaultvalue = [('joy', 0.0), ('fear', 0.0), ('sadness', 0.0), ('anger', 0.0), ('analytical', 0.0), ('confident', 0.0), ('tentative', await0.0)]
+            defaultvalue = [('joy', 0.0), ('fear', 0.0), ('sadness', 0.0), ('anger', 0.0), ('analytical', 0.0), ('confident', 0.0), ('tentative', 0.0)]
             res_score, ori_score = dict(defaultvalue), dict(defaultvalue)
             for t in ori['document_tone']['tones']:
                 if t['tone_id'] in ori_score.keys():
