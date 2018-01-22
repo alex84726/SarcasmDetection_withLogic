@@ -46,23 +46,23 @@ def calculate_prediction(ori_score, fea_score):
     difference = fea_score - ori_score
     # consider difference
     if difference > 1:
-        prediction += 0.5
+        prediction += 0.6
     elif difference == 1:
-        prediction += 0.3
+        prediction += 0.4
     elif difference < 0:
         prediction -= 0.3
     # consider feature score
     if fea_score == 0:
-        prediction += 0.6
+        prediction += 0.7
     elif fea_score == 1:
-        prediction += 0.4
+        prediction += 0.5
     elif fea_score > 2:
-        prediction -= 0.2
+        prediction -= 0.25
     
     if prediction > 1:
-        prediction == 1 
+        prediction = 1 
     elif prediction < 0:
-        prediction == 0
+        prediction = 0
     return float(prediction)
 
 def extract_rule1(revs):
@@ -92,6 +92,8 @@ def extract_rule1(revs):
             senti_ori = int(ori_annotate["sentences"][0]["sentimentValue"]) if ori_annotate["sentences"] != [] else 2
             
             rule1_senti.append(calculate_prediction(senti_ori, senti_fea))
+            print(text, senti_ori)
+            print(fea, senti_fea)
             print('Found \'love\'. Finish annotation.')
         else:
             rule1_ind.append(0)
