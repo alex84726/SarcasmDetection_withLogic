@@ -10,13 +10,10 @@ from watson_developer_cloud import ToneAnalyzerV3
 import json
 import numpy as np
 
-# from server import Server
-# nlp_server = Server()
 from pycorenlp import StanfordCoreNLP
 
 nlp = StanfordCoreNLP('http://localhost:9000')
 warnings.filterwarnings("ignore")
-
 
 def ibm():
     data_file = sys.argv[1]
@@ -31,12 +28,10 @@ def ibm():
     np.save(fea_file, rule1_fea)
     print("feature dumped!")
 
-
 def main():
     data_file = sys.argv[1]
     print("loading data...")
     x_text, y = load_npy_data(data_file)
-    # revs, W, W2, word_idx_map, vocab = x[0], x[1], x[2], x[3], x[4]
     print("data loaded!")
     rule1_fea = extract_rule1(x_text)
     fea_file = splitext(data_file)[0] + '.fea.npy'
@@ -44,36 +39,31 @@ def main():
     print("feature dumped!")
     # nlp_server.stop()
 
+def calculate_prediction(ori_score, fea_score):
+    # heuristic give out prediction
 
-def text_after_first(text, part):
-    if part in text:
-        return ''.join(text.split(part)[1:])
-    else:
-        return ''
-
-
-"""
-def extract_but(revs):
-    but_fea = []
-    but_ind = []
-    but_fea_cnt = 0
-    for rev in revs:
-        text = rev["text"]
-        if ' but ' in text:
-            but_ind.append(1)
-            # make the text after 'but' as the feature
-            fea = text.split('but')[1:]
-            fea = ''.join(fea)
-            fea = fea.strip().replace('  ', ' ')
-            but_fea_cnt += 1
-        else:
-            but_ind.append(0)
-            fea = ''
-        but_fea.append(fea)
-    print '#but %d' % but_fea_cnt
-    return {'but_text': but_fea, 'but_ind': but_ind}
-"""
-
+    prediction = 0
+    difference = fea_score - ori_score
+    # consider difference
+    if difference > 1:
+        prediction += 0.5
+    elif difference == 1:
+        prediction += 0.3
+    elif difference < 0:
+        prediction -= 0.3
+    # consider feature score
+    if fea_score == 0:
+        prediction += 0.6
+    elif fea_score == 1:
+        prediction += 0.4
+    elif fea_score > 2:
+        prediction -= 0.2
+    
+    if prediction > 1:
+        prediction == 1 
+    elif prediction < 0:
+        prediction == 0
+    return float(prediction)
 
 def extract_rule1(revs):
     rule1_fea = []
@@ -81,33 +71,32 @@ def extract_rule1(revs):
     rule1_senti = []
     rule1_fea_cnt = 0
     for text in revs:
-        if ' love ' in text:
+        if ' love ' in text or 'love ' in text:
             rule1_ind.append(1)
-            # make the text after 'love' as the feature
             fea = text.split('love')[1:]
             fea = ''.join(fea)
             fea = fea.strip().replace('  ', ' ')
             rule1_fea_cnt += 1
             rule1_fea.append(fea)
 
-            res = nlp.annotate(
+            fea_annotate = nlp.annotate(
                 fea,
                 properties={'annotators': 'sentiment',
                             'outputFormat': 'json'})
-
-            ori = nlp.annotate(
+            ori_annotate = nlp.annotate(
                 text,
                 properties={'annotators': 'sentiment',
                             'outputFormat': 'json'})
-            #senti_res = (int(res["sentences"][0]["sentimentValue"]) - 1) / 2.0 if res["sentences"] != [] else 0.5
-            #senti_ori = (int(ori["sentences"][0]["sentimentValue"]) - 1) / 2.0 if ori["sentences"] != [] else 0.5
-            #rule1_senti.append((senti_ori - senti_res) * 0.5 + 0.5)
-            rule1_senti.append(int(res["sentences"][0]["sentimentValue"])/4.0 if res["sentences"] != [] else 0.5)
+            
+            senti_fea = int(fea_annotate["sentences"][0]["sentimentValue"]) if fea_annotate["sentences"] != [] else 2
+            senti_ori = int(ori_annotate["sentences"][0]["sentimentValue"]) if ori_annotate["sentences"] != [] else 2
+            
+            rule1_senti.append(calculate_prediction(senti_ori, senti_fea))
             print('Found \'love\'. Finish annotation.')
         else:
             rule1_ind.append(0)
             rule1_fea.append('')
-            rule1_senti.append(0.5)
+            rule1_senti.append(0)
     print('Number of #rule1: %d' % rule1_fea_cnt)
     return {
         'rule1_text': rule1_fea,
@@ -115,13 +104,7 @@ def extract_rule1(revs):
         'rule1_senti': rule1_senti,
     }
 
-
-
 def clean_str(string):
-    """
-    Tokenization/string cleaning for all datasets except for SST.
-    Original taken from https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py
-    """
     string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)
     string = re.sub(r"\'s", " \'s", string)
     string = re.sub(r"\'ve", " \'ve", string)
@@ -137,7 +120,6 @@ def clean_str(string):
     string = re.sub(r"\s{2,}", " ", string)
     return string.strip().lower()
 
-
 def load_npy_data(data_file):
     '''
     input: numpy array of shape[?, 2]
@@ -148,15 +130,17 @@ def load_npy_data(data_file):
     '''
     data = np.load(data_file)
     X = data[:, 1]
-    # X = [clean_str(s.decode('utf-8')) for s in X]
+    X = [clean_str(s.decode('utf-8')) for s in X]
     index = list(map(int, data[:, 0]))
     y = np.zeros([len(index), 2])
     for i, v in enumerate(index):
         y[i][v] = 1
     return X, y
 
-
 def extract_rule_ibm(revs, tone_analyzer):
+    '''
+    need to update
+    '''
     rule1_fea = []
     rule1_ind = []
     rule1_senti = []
@@ -196,7 +180,6 @@ def extract_rule_ibm(revs, tone_analyzer):
         'rule1_ind': rule1_ind,
         'rule1_senti': rule1_senti,
     }
-
 
 if __name__ == "__main__":
     main()

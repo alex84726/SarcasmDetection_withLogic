@@ -75,7 +75,6 @@ def load_npy_data(data_file):
         y[i][v] = 1
     return X, y
 
-
 def batch_iter(x, y, batch_size, num_epochs, shuffle=True):
     """
     Generates a batch iterator for a dataset.

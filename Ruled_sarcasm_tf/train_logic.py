@@ -24,31 +24,36 @@ except:
 
 # Data loading params
 tf.flags.DEFINE_float("dev_sample_percentage", 0.1, "Percentage of the training data to use for validation")
-tf.flags.DEFINE_string("positive_data_file", "../Data/sarcasm_data_proc.npy", "Data source for the positive data.")
-tf.flags.DEFINE_string("negative_data_file", "../Data/nonsarc_data_proc.npy", "Data source for the negative data.")
+tf.flags.DEFINE_string("positive_data_file", "../Data/sarcasm_data_proc.npy", "Data source for the sarcasm data.")
+tf.flags.DEFINE_string("negative_data_file", "../Data/nonsarc_data_proc.npy", "Data source for the non_sarcasm data.")
 tf.flags.DEFINE_string("data_file", "../Data/train_balanced.npy", "Data source for the training data.")
 tf.flags.DEFINE_string("fea_file", "../Data/train_balanced.fea.npy", "Data source for the training feature data.")
 
 # Model Hyperparameters
-tf.flags.DEFINE_integer("embedding_dim", 128, "Dimensionality of character embedding (default: 128)")
-tf.flags.DEFINE_string("filter_sizes", "3,4,5", "Comma-separated filter sizes (default: '3,4,5')")
+tf.flags.DEFINE_integer("embedding_dim", 128, "Dimensionality of word embedding (default: 128)")
+tf.flags.DEFINE_string("filter_sizes", "3,4,5", "CNN filter sizes (default: '3,4,5')")
 tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (default: 128)")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 0.0)")
 tf.flags.DEFINE_boolean("word2vec", False, "Using pre-trained word2vec as initializer (default: False)")
 tf.flags.DEFINE_boolean("train_word2vec", False, "Whether to train word2vec (default: False)")
-tf.flags.DEFINE_string("pi_params", "0.95,0", "parameters of pi: 'base of decay func, lower bound' (default: '0.95,0 ')")
-tf.flags.DEFINE_string("pi_curve", "exp_arise", "type of pi change curve: exp_arise, exp_decay,linear_arise, linear_decay (default: exp_arise)")
+tf.flags.DEFINE_string("pi_params", "0.95,0", "parameters of pi: 'base of decay func, lower bound' (default: '0.95,0')")
+tf.flags.DEFINE_string("pi_curve", "exp_arise", "type of pi change curve: exp_arise, exp_decay, linear_arise, linear_decay (default: exp_arise)")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 32, "Batch Size (default: 32)")
-tf.flags.DEFINE_integer("num_epochs", 80, "Number of training epochs (default: 80)")
+tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 10)")
 tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (default: 5)")
 
 # Misc Parameters
+# If you would like TensorFlow to automatically choose an existing and supported
+# device to run the operations in case the specified one doesn't exist, you can
+# set allow_soft_placement to True
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
+# To find out which devices your operations and tensors are assigned to, create
+# the session with log_device_placement configuration option set to True.
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
 tf.flags.DEFINE_float("gpu_usage", 1.0, "per process gpu memory fraction, (defult: 1.0)")
 
@@ -73,9 +78,9 @@ if FLAGS.train_word2vec:
     vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
     x_w2v = np.array(list(vocab_processor.fit_transform(x_text)))
     pickle.dump(vocab_processor, open('../Data/vocab_processor', 'wb'))
+
 else:
     print("Direct use word embeddings ...")
-    print("Loading word embeddings ...")
     w2v_path = '../Data/GoogleNews-vectors-negative300.bin'
     w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
 
@@ -94,8 +99,8 @@ else:
                 s[j] = UNK_embed
 
         if len(s) < max_document_length:
-            s = [UNK_embed] * (max_document_length - len(s)) + s
-            # s = s + [UNK_embed] * (max_document_length - len(s))
+            # s = [UNK_embed] * (max_document_length - len(s)) + s
+            s = s + [UNK_embed] * (max_document_length - len(s))
         x_w2v[i] = np.asarray(s)
     x_w2v = np.asarray(x_w2v)
 
@@ -110,9 +115,9 @@ x_fea_dev = {}
 for k, v in x_fea.items():
     x_fea_train[k] = v[:dev_sample_index]
     x_fea_dev[k] = v[dev_sample_index:]
+
 print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_) if FLAGS.train_word2vec else len(vocabs) ))
 print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
-
 
 # Training
 # ==================================================
@@ -123,6 +128,8 @@ with tf.Graph().as_default():
         log_device_placement=FLAGS.log_device_placement)
     sess = tf.Session(config=session_conf)
     with sess.as_default():
+        
+        # student network
         cnn = TextCNN(
             sequence_length=x_train.shape[1],
             num_classes=y_train.shape[1],
@@ -136,31 +143,29 @@ with tf.Graph().as_default():
 
         # build the feature of RULE1-rule
         # fea: symbolic feature tensor, of shape 3
-        #      fea[0]   : 1 if x=x1_love_x2, 0 otherwise
-        #      fea[1:2] : classifier.predict_p(x_2)
-
-        rule1_ind = tf.placeholder(tf.int32, [None, 1], name="rule1_ind")
-        rule1_senti = tf.placeholder(tf.int32, [None, 1], name="rule1_senti")
+        #      fea[0]   : 1 if x=groundings, 0 otherwise
+        #      fea[1:2] : prediction of rules
+        rule1_ind = tf.placeholder(tf.float32, [None, 1], name="rule1_ind")
+        rule1_senti = tf.placeholder(tf.float32, [None, 1], name="rule1_senti")
         rule1_rev = tf.ones_like(rule1_senti) - rule1_senti
-        rule1_y_pred_p = tf.concat([rule1_rev, rule1_senti], axis=1)
-        rule1_full = tf.concat([rule1_ind, rule1_y_pred_p], axis=1)
+        rule1_full = tf.concat([rule1_ind, rule1_rev, rule1_senti], axis=1)
+        
         # add logic layer
         nclasses = 2
-        # Rule_input = cnn.embedded_chars
         Rule_input = cnn.input_x
-        rules = [
-            FOL_Rule1(nclasses, Rule_input, rule1_full),
-        ]
-        rule_lambda = [1]  # confidence for the "rule1" rule = 1
-        pi_holder = tf.placeholder(tf.float32, [1], name='pi')
-        # pi: how percentage listen to teacher loss, starts from lower bound
+        Rule_true_label = cnn.input_y
+        rules = [FOL_Rule1(nclasses, Rule_input, rule1_full, Rule_true_label)]
+        rule_lambda = [1]  # confidence for the "love" rule = 1
+        # pi_holder = tf.placeholder(tf.float32, [1], name='pi')
 
         logic_nn = LogicNN(
             network=cnn,
             rules=rules,
             rule_lambda=rule_lambda,
-            pi=pi_holder,
-            C=1.)
+            # pi=pi_holder,
+            C=1., # C is the regularization parameter
+            batch_size=FLAGS.batch_size
+        )
 
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
@@ -244,13 +249,12 @@ with tf.Graph().as_default():
                         params=FLAGS.pi_params,
                         curve=FLAGS.pi_curve,
                         data_len=x_train.shape[0],)
-            print("pi: ", pi)
             feed_dict = {
                 logic_nn.network.input_x: x_batch,
                 logic_nn.network.input_y: y_batch,
                 logic_nn.network.dropout_keep_prob: FLAGS.dropout_keep_prob,
                 logic_nn.pi: pi,
-                rule1_ind: np.expand_dims(x_fea_batch["rule1_ind"], 1),
+                rule1_ind: (np.expand_dims(x_fea_batch["rule1_ind"], 1)).astype(float),
                 rule1_senti: np.expand_dims(x_fea_batch["rule1_senti"], 1),
             }
             _, step, summaries, neg_log_liklihood, accuracy = sess.run(
@@ -278,7 +282,7 @@ with tf.Graph().as_default():
                 logic_nn.network.input_y: y_batch,
                 logic_nn.network.dropout_keep_prob: 1.,
                 logic_nn.pi: pi,
-                rule1_ind: np.expand_dims(x_fea_batch["rule1_ind"], 1),
+                rule1_ind: (np.expand_dims(x_fea_batch["rule1_ind"], 1)).astype(float),
                 rule1_senti: np.expand_dims(x_fea_batch["rule1_senti"], 1),
             }
             step, summaries, loss, accuracy = sess.run(
@@ -317,7 +321,6 @@ with tf.Graph().as_default():
         # Batches Generator
         batches = data_helpers.batch_fea_iter(
             x_train, y_train, x_fea_train, FLAGS.batch_size, FLAGS.num_epochs)
-
         # Training loop. For each batch...
         for batch in batches:
             x_batch, y_batch, x_fea_batch = batch

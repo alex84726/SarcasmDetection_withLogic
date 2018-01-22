@@ -3,27 +3,28 @@ import tensorflow as tf
 
 
 class LogicNN(object):
-    def __init__(self, network, rules=[], rule_lambda=[], pi=None, C=1.):
+    def __init__(self, network, rules=[], rule_lambda=[], C=1., batch_size=64):
         """
         :param input: symbolic image tensor, of shape image_shape
         :param network: student network
         """
         self.network = network
         self.input = self.network.input_x
+        self.true_label = self.network.input_y
         self.rules = rules  # rules[i].input / rules[i].fea are tf.place_holder
         self.rule_lambda = tf.constant(rule_lambda, dtype=tf.float32, name='rule_lambda')
         self.ones = tf.ones([len(rules)], name='ones', dtype=tf.float32)
         self.pi = tf.placeholder(tf.float32, [], name="pi")
-        # TODO: duplicate announce  
-        # pi: how percentage listen to teacher loss, starts from lower bound
         self.C = C
+        # pi: how percentage listen to teacher loss, starts from lower bound
+        self.batch_size = batch_size
 
         ## q(y|x)
         # dropout_p_y_given_x: output of a LogisticRegression Layer (of a network)
-        # dropout_q_y_given_x = self.network.h_drop_p * 1.  # self.network.h_drop  = self.network.dropout_p_y_given_x
+        # dropout_q_y_given_x = self.network.h_drop_p * 1. # not sure accuracy
         p_y_given_x = self.network.predict_p * 1.  # self.network.predict_p  = self.network.p_y_given_x
         # combine rule constraints
-        distr = self.calc_rule_constraints()
+        distr = self.calc_rule_constraints(self.batch_size)
         q_y_given_x = tf.multiply(p_y_given_x, distr)
         # dropout_q_y_given_x *= distr
 
@@ -56,21 +57,20 @@ class LogicNN(object):
 
         # return LogicNN's q/p prob. predictions
         self.p_y_pred_p = self.network.predict_p
-        self.q_y_pred_p = self.p_y_pred_p * self.calc_rule_constraints()
+        self.q_y_pred_p = self.p_y_pred_p * self.calc_rule_constraints(self.batch_size)
 
         q_correct_predictions = tf.equal(self.q_y_pred, tf.argmax(self.network.input_y, 1))
         self.q_accuracy = tf.reduce_mean(tf.cast(q_correct_predictions, "float"), name="q_accuracy")
 
     # methods for LogicNN
-    def calc_rule_constraints(self):
+    def calc_rule_constraints(self, batch_size):
         if 'new_rule_fea' not in locals():
             new_rule_fea = [None] * len(self.rules)
         distr_all = tf.zeros(shape=[1], dtype=tf.float32)  # will be broadcast
         for i, rule in enumerate(self.rules):
-            distr = rule.log_distribution(self.C * self.rule_lambda[i], rule.input, rule.fea)
+            distr = rule.log_distribution(self.C * self.rule_lambda[i], rule.input, rule.fea, rule.true_label, batch_size)
             distr_all += distr
-        #distr_all += distr
-        #
+        distr_all = tf.reshape(distr_all, [tf.shape(distr_all)[0],1])
         distr_y0 = distr_all[:, 0]
         distr_y0 = tf.expand_dims(distr_y0, -1)
         distr_y0_copies = tf.tile(distr_y0, [1, int(distr_all.get_shape()[1])])
