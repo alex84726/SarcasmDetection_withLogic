@@ -14,7 +14,7 @@ from pycorenlp import StanfordCoreNLP
 
 nlp = StanfordCoreNLP('http://localhost:9000')
 warnings.filterwarnings("ignore")
-
+# acc: 0.76185
 def ibm():
     data_file = sys.argv[1]
     USERNAME = sys.argv[2]
