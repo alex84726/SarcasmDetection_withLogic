@@ -9,7 +9,7 @@ from os.path import splitext
 from watson_developer_cloud import ToneAnalyzerV3
 import json
 import numpy as np
-
+from collections import Counter
 from pycorenlp import StanfordCoreNLP
 
 nlp = StanfordCoreNLP('http://localhost:9000')
@@ -33,44 +33,54 @@ def main():
     print("loading data...")
     x_text, y = load_npy_data(data_file)
     print("data loaded!")
-    rule1_fea = extract_rule1(x_text)
+    rule1_fea, s = extract_rule1(x_text, y)
     fea_file = splitext(data_file)[0] + '.fea.npy'
     np.save(fea_file, rule1_fea)
     print("feature dumped!")
     # nlp_server.stop()
+    return s
 
 def calculate_prediction(ori_score, fea_score):
     # heuristic give out prediction
 
     prediction = 0
-    difference = fea_score - ori_score
+    difference = ori_score - fea_score
     # consider difference
     if difference > 1:
-        prediction += 0.6
+        prediction += 0.75
     elif difference == 1:
-        prediction += 0.4
+        prediction += 0.55
+    elif difference == 0:
+        prediction += 0.28
     elif difference < 0:
         prediction -= 0.3
     # consider feature score
-    if fea_score == 0:
-        prediction += 0.7
-    elif fea_score == 1:
-        prediction += 0.5
-    elif fea_score > 2:
-        prediction -= 0.25
+    if fea_score < 2:
+        prediction += 0.75
+    elif fea_score == 2:
+        prediction += 0.6
+    elif fea_score == 3:
+        prediction += 0.25
+    elif fea_score > 3:
+        prediction -= 0.3
+
+    if ori_score < 2:
+        prediction +=0.22
     
     if prediction > 1:
-        prediction = 1 
+        prediction = 1.0 
     elif prediction < 0:
         prediction = 0
     return float(prediction)
 
-def extract_rule1(revs):
+def extract_rule1(revs, y):
     rule1_fea = []
     rule1_ind = []
     rule1_senti = []
     rule1_fea_cnt = 0
-    for text in revs:
+    correct = 0
+    s = Counter()
+    for idx, text in enumerate(revs):
         if ' love ' in text or 'love ' in text:
             rule1_ind.append(1)
             fea = text.split('love')[1:]
@@ -91,20 +101,33 @@ def extract_rule1(revs):
             senti_fea = int(fea_annotate["sentences"][0]["sentimentValue"]) if fea_annotate["sentences"] != [] else 2
             senti_ori = int(ori_annotate["sentences"][0]["sentimentValue"]) if ori_annotate["sentences"] != [] else 2
             
-            rule1_senti.append(calculate_prediction(senti_ori, senti_fea))
-            print(text, senti_ori)
-            print(fea, senti_fea)
-            print('Found \'love\'. Finish annotation.')
+            score = calculate_prediction(senti_ori, senti_fea)
+            rule1_senti.append(score)
+            if y[idx][1] ==1 and score > 0.5:
+                correct += 1
+            elif y[idx][1] ==0 and score < 0.5:
+                correct += 1
+            s[(senti_ori,senti_fea,y[idx][1],score)]+=1
+            '''
+            else:
+                print(text, senti_ori)
+                print(fea, senti_fea)
+                print('True label', y[idx][1])
+                print('Prediction', score)
+                print()
+            '''
         else:
             rule1_ind.append(0)
             rule1_fea.append('')
             rule1_senti.append(0)
+
     print('Number of #rule1: %d' % rule1_fea_cnt)
+    print('Accuracy', correct/rule1_fea_cnt)
     return {
         'rule1_text': rule1_fea,
         'rule1_ind': rule1_ind,
         'rule1_senti': rule1_senti,
-    }
+    }, s
 
 def clean_str(string):
     string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)
@@ -184,5 +207,5 @@ def extract_rule_ibm(revs, tone_analyzer):
     }
 
 if __name__ == "__main__":
-    main()
+    s =main()
     # ibm()
